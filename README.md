@@ -1,7 +1,7 @@
 # transformer-train-script
 
 ## What is this?
-A little script I made to train a transformer.
+A little PyTorch script I made to train a transformer.
 Currently supports the tiny_stories dataset, and all of shakespeare as a text file, using each character as a token.
 
 ## How to Use
