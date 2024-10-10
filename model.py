@@ -75,6 +75,15 @@ class transformer_block(torch.nn.Module):
         self.network_config = network_config
 
 
+
+        assert block_config.key_size % block_config.n_attn_heads == 0
+        self.key_head_size = block_config.hidden_size // block_config.n_attn_heads
+
+        assert block_config.value_size % block_config.n_attn_heads == 0
+        self.value_head_size = block_config.hidden_size // block_config.n_attn_heads
+
+
+
         self.first_ln = torch.nn.LayerNorm(block_config.hidden_size, bias = False)
         self.second_ln = torch.nn.LayerNorm(block_config.hidden_size, bias = False)
 
@@ -147,8 +156,8 @@ class transformer_block(torch.nn.Module):
 
         queries = self.query_layer(activation_norms).unflatten(-1, (self.block_config.n_attn_heads, self.block_config.key_head_size))
 
-        incoming_keys = self.key_layer(activation_norms).unflatten(-1, (self.block_config.n_attn_heads, self.block_config.key_head_size))
-        incoming_values = self.value_layer(activation_norms).unflatten(-1, (self.block_config.n_attn_heads, self.block_config.value_head_size))
+        incoming_keys = self.key_layer(activation_norms).unflatten(-1, (self.block_config.n_attn_heads, self.key_head_size))
+        incoming_values = self.value_layer(activation_norms).unflatten(-1, (self.block_config.n_attn_heads, self.value_head_size))
 
 
         incoming_keys, incoming_values = self.position_embedding(incoming_keys, incoming_values, index, index + queries.size(-3))
@@ -189,15 +198,9 @@ class transformer_network(torch.nn.Module):
 
         self.config = config
 
-        for block_config in config.block_configs:
-            assert block_config.key_size % block_config.n_attn_heads == 0
-            block_config.key_head_size = block_config.hidden_size // block_config.n_attn_heads
-
-            assert block_config.value_size % block_config.n_attn_heads == 0
-            block_config.value_head_size = block_config.hidden_size // block_config.n_attn_heads
-
-            self.blocks = torch.nn.ModuleList([transformer_block(config, block_config) for block_config in config.block_configs])
-
+        
+        self.blocks = torch.nn.ModuleList([transformer_block(config, block_config) for block_config in config.block_configs])
+        
         
         self.wte = torch.nn.Embedding(config.vocab_size, config.embedding_size)
         torch.nn.init.normal_(self.wte.weight, mean = 0, std = 0.02)
