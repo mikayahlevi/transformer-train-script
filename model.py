@@ -16,9 +16,6 @@ class transformer_block_config:
     key_size: int
     value_size: int
 
-    # key_head_size: int
-    # value_head_size: int
-
 
 
 @dataclass
