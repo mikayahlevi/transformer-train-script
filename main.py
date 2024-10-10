@@ -65,11 +65,11 @@ if __name__ == '__main__':
             os.makedirs(traincfg.train_run_path  + '/models')
             os.makedirs(traincfg.train_run_path  + '/stats')
 
-            with open(traincfg.train_run_path  + '/settings.json', 'w') as f:
+            with open(traincfg.train_run_path  + '/traincfg.json', 'w') as f:
                 f.write(json.dumps(dataclasses.asdict(traincfg)))
-            with open(traincfg.train_run_path  + '/hyperparameters.json', 'w') as f:
+            with open(traincfg.train_run_path  + '/hparams.json', 'w') as f:
                 f.write(json.dumps(dataclasses.asdict(hparams)))
-            with open(traincfg.train_run_path  + '/model.json', 'w') as f:
+            with open(traincfg.train_run_path  + '/modelcfg.json', 'w') as f:
                 f.write(json.dumps(dataclasses.asdict(modelcfg)))
 
             train_run_path_created = True
