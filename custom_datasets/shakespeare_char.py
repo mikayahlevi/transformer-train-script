@@ -45,7 +45,6 @@ def get_dataset_and_tokenizer(sequence_length: int):
 
         train_to_val_ratio = 0.9
         train_len = round(len(ids) * train_to_val_ratio)
-        val_len = len(ids) - train_len
 
         train_ids = ids[:train_len]
         val_ids = ids[train_len:]
