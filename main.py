@@ -30,7 +30,7 @@ if __name__ == '__main__':
 
 
     # load the dataset module
-    dataset_module = importlib.import_module(f'custom_datasets.tiny_stories')
+    dataset_module = importlib.import_module(f'custom_datasets.{args.dataset}')
 
 
     # load the configs from the json files
