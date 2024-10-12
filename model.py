@@ -207,7 +207,6 @@ class transformer_network(torch.nn.Module):
         
         self.lm_head = torch.nn.Linear(config.embedding_size, config.vocab_size, bias = False)
         self.lm_head.weight = self.wte.weight
-        # torch.nn.init.normal_(self.lm_head.weight, mean = 0, std = 0.02)
 
     # index should start at 0
     def forward(self, encodings: torch.Tensor, kv_cache: list[tuple[torch.Tensor, torch.Tensor]], index: int) -> tuple[torch.Tensor, list[tuple[torch.Tensor, torch.Tensor]]]:
