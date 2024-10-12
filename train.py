@@ -126,7 +126,7 @@ def train(settings, hyperparameters, model, dataset, tokenizer, device):
 
     train_dataloader = torch.utils.data.DataLoader(dataset['train'], batch_size = settings.batch_size, shuffle = True, pin_memory = True, pin_memory_device = device)
     val_dataloader = torch.utils.data.DataLoader(dataset['validation'], batch_size = settings.batch_size, shuffle = True, pin_memory = True, pin_memory_device = device)
-    
+
 
     criterion = torch.nn.CrossEntropyLoss(reduction = 'mean')
     if tokenizer.padding:
