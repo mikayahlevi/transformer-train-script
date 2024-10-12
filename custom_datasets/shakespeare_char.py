@@ -10,16 +10,19 @@ class character_tokenizer:
         self.vocab = vocab
         self.vocab_size = len(vocab)
 
-        self.token_to_id = {token: i for i, token in enumerate(vocab)}
-        self.id_to_token = {i: token for i, token in enumerate(vocab)}
+        self.token_to_id_dict = {token: i for i, token in enumerate(vocab)}
+        self.id_to_token_dict = {i: token for i, token in enumerate(vocab)}
 
         self.padding = False
 
     def encode(self, text):
-        return [self.token_to_id[token] for token in text]
+        return [self.token_to_id_dict[token] for token in text]
+    
+    def token_to_id(self, token):
+        return self.token_to_id_dict[token]
 
     def decode(self, ids):
-        return ''.join([self.id_to_token[i] for i in ids])
+        return ''.join([self.id_to_token_dict[i] for i in ids])
     
     def get_vocab_size(self):
         return self.vocab_size
