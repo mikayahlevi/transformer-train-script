@@ -15,6 +15,8 @@ class character_tokenizer:
 
         self.padding = False
 
+        self.character_level = True
+
     def encode(self, text):
         return [self.token_to_id_dict[token] for token in text]
     

@@ -215,7 +215,10 @@ def train(settings, hyperparameters, model, dataset, tokenizer, device):
                 print(colorama.Fore.GREEN, end='')
                 print('sample:')
                 print(colorama.Style.RESET_ALL, end='')
-                sequence_start = '<bos>'
+                if hasattr(tokenizer, 'character_level'):
+                    sequence_start = 'A'
+                else:
+                    sequence_start = '<bos>'
                 print(sample(model, tokenizer, sequence_start = sequence_start, temperature = 1.0, max_length = settings.sequence_length, device = device))
                 print()
                 model.train()
@@ -306,7 +309,10 @@ def train(settings, hyperparameters, model, dataset, tokenizer, device):
                 print(colorama.Fore.GREEN, end='')
                 print('sample:')
                 print(colorama.Style.RESET_ALL, end='')
-                sequence_start = '<bos>'
+                if hasattr(tokenizer, 'character_level'):
+                    sequence_start = 'A'
+                else:
+                    sequence_start = '<bos>'
                 print(sample(model, tokenizer, sequence_start = sequence_start, temperature = 1.0, max_length = settings.sequence_length, device = device))
                 print()
                 model.train()
