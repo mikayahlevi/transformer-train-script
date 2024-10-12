@@ -46,21 +46,20 @@ class xpos(torch.nn.Module):
         # no effect except for numerical stability
         half_max_sequence_length = max_sequence_length // 2
 
-        self.seq_range = torch.arange(- half_max_sequence_length, max_sequence_length - half_max_sequence_length, dtype = torch.float32, device = device) / scale_base
+        self.seq_range = torch.arange(- half_max_sequence_length, max_sequence_length - half_max_sequence_length, dtype = torch.float32, device = device).view(-1, 1, 1) / scale_base
+
+        self.c = torch.cos(self.seq_range * self.theta.view(1, 1, -1))
+        self.s = torch.sin(self.seq_range * self.theta.view(1, 1, -1))
+        self.t = (self.zeta.view(1, 1, -1) ** self.seq_range)
+        self.invt = 1 / self.t
 
     def rotate_every_two(self, input: torch.Tensor) -> torch.Tensor:
         return torch.stack((-input[..., 1::2], input[..., 0::2]), dim = -1).flatten(-2)
 
 
     def forward(self, queries, keys, start, end) -> tuple[torch.Tensor, torch.Tensor]:
-        seq_range = self.seq_range[start:end].view(-1, 1, 1)
-
-        c = torch.cos(seq_range * self.theta.view(1, 1, -1))
-        s = torch.sin(seq_range * self.theta.view(1, 1, -1))
-        t = (self.zeta.view(1, 1, -1) ** seq_range)
-
-        queries = (queries * c + self.rotate_every_two(queries) * s) * t
-        keys = (keys * c + self.rotate_every_two(keys) * s) * (t ** -1)
+        queries = (queries * self.c[start:end] + self.rotate_every_two(queries) * self.s[start:end]) * self.t[start:end]
+        keys = (keys * self.c[start:end] + self.rotate_every_two(keys) * self.s[start:end]) * self.invt[start:end]
 
 
         return queries, keys
