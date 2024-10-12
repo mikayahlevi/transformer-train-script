@@ -24,6 +24,8 @@ class transformer_network_config:
     embedding_size: int
 
     dropout_rate: float
+
+    max_sequence_length: int
     
     block_configs: list[transformer_block_config]
 
@@ -105,7 +107,7 @@ class transformer_block(torch.nn.Module):
         self.attention_linear = torch.nn.Linear(block_config.value_size, block_config.hidden_size, bias = False)
         torch.nn.init.normal_(self.attention_linear.weight, mean = 0, std = 0.02 / math.sqrt(len(network_config.block_configs)))
 
-        self.position_embedding = xpos(self.block_config.key_size // self.block_config.n_attn_heads, device = 'cuda', max_sequence_length = 1024)
+        self.position_embedding = xpos(self.key_head_size, device = 'cuda', max_sequence_length = network_config.max_sequence_length)
     
 
     def get_full_kv(self, incoming_kv, kv_cache, index) -> tuple[tuple[torch.Tensor, torch.Tensor], Optional[torch.Tensor]]:
@@ -151,7 +153,7 @@ class transformer_block(torch.nn.Module):
     def forward(self, activations: torch.Tensor, kv_cache: tuple[torch.Tensor, torch.Tensor], index) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
         activation_norms = self.first_ln(activations)
 
-        queries = self.query_layer(activation_norms).unflatten(-1, (self.block_config.n_attn_heads, self.block_config.key_head_size))
+        queries = self.query_layer(activation_norms).unflatten(-1, (self.block_config.n_attn_heads, self.key_head_size))
 
         incoming_keys = self.key_layer(activation_norms).unflatten(-1, (self.block_config.n_attn_heads, self.key_head_size))
         incoming_values = self.value_layer(activation_norms).unflatten(-1, (self.block_config.n_attn_heads, self.value_head_size))
@@ -226,7 +228,7 @@ class transformer_network(torch.nn.Module):
     def get_empty_kv_cache(self, batch_size: int, sequence_length: int, device) -> list[tuple[torch.Tensor, torch.Tensor]]:
         return ([
             (
-                torch.empty(batch_size, sequence_length, block_config.n_attn_heads, block_config.key_head_size, device = device).squeeze(-4), # type: ignore
-                torch.empty(batch_size, sequence_length, block_config.n_attn_heads, block_config.value_head_size, device = device).squeeze(-4) # type: ignore
+                torch.empty(batch_size, sequence_length, block.block_config.n_attn_heads, block.key_head_size, device = device).squeeze(-4),
+                torch.empty(batch_size, sequence_length, block.block_config.n_attn_heads, block.value_head_size, device = device).squeeze(-4)
             )
-        for block_config in self.config.block_configs])
+        for block in self.blocks])
