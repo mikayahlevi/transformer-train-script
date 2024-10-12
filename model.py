@@ -35,22 +35,22 @@ class xpos(torch.nn.Module):
     def __init__(self, key_head_size: int, device = 'cuda', max_sequence_length: int = 1024):
         super(xpos, self).__init__()
 
-        self.theta_base = 10000
-        self.alpha = 0.4 * key_head_size
+        theta_base = 10000
+        alpha = 0.4 * key_head_size
 
         drange = torch.arange(start = 2, end = key_head_size + 2, step = 2, dtype = torch.float32, device = device)
-        self.theta = torch.pow(1 / self.theta_base, drange / key_head_size).repeat_interleave(2)
-        self.zeta = ((drange / (key_head_size / 2) + self.alpha) / (1 + self.alpha)).repeat_interleave(2)
+        theta = torch.pow(1 / theta_base, drange / key_head_size).repeat_interleave(2)
+        zeta = ((drange / (key_head_size / 2) + alpha) / (1 + alpha)).repeat_interleave(2)
         # no effect except for numerical stability
         scale_base = 512
         # no effect except for numerical stability
         half_max_sequence_length = max_sequence_length // 2
 
-        self.seq_range = torch.arange(- half_max_sequence_length, max_sequence_length - half_max_sequence_length, dtype = torch.float32, device = device).view(-1, 1, 1) / scale_base
+        seq_range = torch.arange(- half_max_sequence_length, max_sequence_length - half_max_sequence_length, dtype = torch.float32, device = device).view(-1, 1, 1) / scale_base
 
-        self.c = torch.cos(self.seq_range * self.theta.view(1, 1, -1))
-        self.s = torch.sin(self.seq_range * self.theta.view(1, 1, -1))
-        self.t = (self.zeta.view(1, 1, -1) ** self.seq_range)
+        self.c = torch.cos(seq_range * theta.view(1, 1, -1))
+        self.s = torch.sin(seq_range * theta.view(1, 1, -1))
+        self.t = (zeta.view(1, 1, -1) ** seq_range)
         self.invt = 1 / self.t
 
     def rotate_every_two(self, input: torch.Tensor) -> torch.Tensor:
