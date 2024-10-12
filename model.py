@@ -35,6 +35,9 @@ class xpos(torch.nn.Module):
     def __init__(self, key_head_size: int, device = 'cuda', max_sequence_length: int = 1024):
         super(xpos, self).__init__()
 
+        if key_head_size % 2 != 0:
+            raise ValueError("key head size must be divisible by 2 for the positional embedding")
+
         theta_base = 10000
         alpha = 0.4 * key_head_size
 
@@ -52,6 +55,8 @@ class xpos(torch.nn.Module):
         self.s = torch.sin(seq_range * theta.view(1, 1, -1))
         self.t = (zeta.view(1, 1, -1) ** seq_range)
         self.invt = 1 / self.t
+
+
 
     def rotate_every_two(self, input: torch.Tensor) -> torch.Tensor:
         return torch.stack((-input[..., 1::2], input[..., 0::2]), dim = -1).flatten(-2)
@@ -74,10 +79,12 @@ class transformer_block(torch.nn.Module):
 
 
 
-        assert block_config.key_size % block_config.n_attn_heads == 0
+        if block_config.key_size % block_config.n_attn_heads != 0:
+            raise ValueError("key size must be divisible by the number of attention heads")
         self.key_head_size = block_config.hidden_size // block_config.n_attn_heads
 
-        assert block_config.value_size % block_config.n_attn_heads == 0
+        if block_config.value_size % block_config.n_attn_heads != 0:
+            raise ValueError("value size must be divisible by the number of attention heads")
         self.value_head_size = block_config.hidden_size // block_config.n_attn_heads
 
 
