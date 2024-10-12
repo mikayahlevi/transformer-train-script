@@ -117,46 +117,49 @@ class transformer_block(torch.nn.Module):
     
 
     def get_full_kv(self, incoming_kv, kv_cache, index) -> tuple[tuple[torch.Tensor, torch.Tensor], Optional[torch.Tensor]]:
-        incoming_keys, incoming_values = incoming_kv
-        cache_keys, cache_values = kv_cache
-
-        incoming_sequence_length = incoming_keys.size(-3)
-        cache_sequence_length = index
-        total_sequence_length = incoming_sequence_length + cache_sequence_length
-        max_sequence_length = cache_keys.size(-3)
-
-        if total_sequence_length > max_sequence_length:
-            raise ValueError("total sequence length is greater than the maximum sequence length")
-        elif total_sequence_length == max_sequence_length and index == 0:
-            return (incoming_keys, incoming_values), None
-        elif total_sequence_length == max_sequence_length:
-            keys = torch.cat((cache_keys[..., :cache_sequence_length, :, :], incoming_keys), dim = -3)
-            values = torch.cat((cache_values[..., :cache_sequence_length, :, :], incoming_values), dim = -3)
-
-            mask = torch.ones(incoming_sequence_length, total_sequence_length, dtype = torch.bool, device = keys.device).triu()
-
-            return (keys, values), mask
-        elif index == 0:
-            cache_keys[..., :incoming_sequence_length, :, :] = incoming_keys
-            cache_values[..., :incoming_sequence_length, :, :] = incoming_values
-
-            return (incoming_keys, incoming_values), None
+        if kv_cache is None:
+            return incoming_kv, None
         else:
+            incoming_keys, incoming_values = incoming_kv
+            cache_keys, cache_values = kv_cache
 
-            keys = torch.cat((cache_keys[..., :cache_sequence_length, :, :], incoming_keys), dim = -3)
-            values = torch.cat((cache_values[..., :cache_sequence_length, :, :], incoming_values), dim = -3)
+            incoming_sequence_length = incoming_keys.size(-3)
+            cache_sequence_length = index
+            total_sequence_length = incoming_sequence_length + cache_sequence_length
+            max_sequence_length = cache_keys.size(-3)
 
-            cache_keys[..., cache_sequence_length:total_sequence_length, :, :] = incoming_keys
-            cache_values[..., cache_sequence_length:total_sequence_length, :, :] = incoming_values
+            if total_sequence_length > max_sequence_length:
+                raise ValueError("total sequence length is larger than the maximum sequence length of the cache")
+            elif total_sequence_length == max_sequence_length and index == 0:
+                return (incoming_keys, incoming_values), None
+            elif total_sequence_length == max_sequence_length:
+                keys = torch.cat((cache_keys[..., :cache_sequence_length, :, :], incoming_keys), dim = -3)
+                values = torch.cat((cache_values[..., :cache_sequence_length, :, :], incoming_values), dim = -3)
 
-            # custom mask so that it can pay attention to the previously passed through tokens
-            mask = torch.ones(incoming_sequence_length, total_sequence_length, dtype = torch.bool, device = keys.device).triu()
+                mask = torch.ones(incoming_sequence_length, total_sequence_length, dtype = torch.bool, device = keys.device).triu()
 
-            return (keys, values), mask
+                return (keys, values), mask
+            elif index == 0:
+                cache_keys[..., :incoming_sequence_length, :, :] = incoming_keys
+                cache_values[..., :incoming_sequence_length, :, :] = incoming_values
+
+                return (incoming_keys, incoming_values), None
+            else:
+
+                keys = torch.cat((cache_keys[..., :cache_sequence_length, :, :], incoming_keys), dim = -3)
+                values = torch.cat((cache_values[..., :cache_sequence_length, :, :], incoming_values), dim = -3)
+
+                cache_keys[..., cache_sequence_length:total_sequence_length, :, :] = incoming_keys
+                cache_values[..., cache_sequence_length:total_sequence_length, :, :] = incoming_values
+
+                # custom mask so that it can pay attention to the cached tokens
+                mask = torch.ones(incoming_sequence_length, total_sequence_length, dtype = torch.bool, device = keys.device).triu()
+
+                return (keys, values), mask
 
 
     
-    def forward(self, activations: torch.Tensor, kv_cache: tuple[torch.Tensor, torch.Tensor], index) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
+    def forward(self, activations: torch.Tensor, kv_cache: Optional[tuple[torch.Tensor, torch.Tensor]], index) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
         activation_norms = self.first_ln(activations)
 
         queries = self.query_layer(activation_norms).unflatten(-1, (self.block_config.n_attn_heads, self.key_head_size))
@@ -216,12 +219,15 @@ class transformer_network(torch.nn.Module):
         self.lm_head.weight = self.wte.weight
 
     # index should start at 0
-    def forward(self, encodings: torch.Tensor, kv_cache: list[tuple[torch.Tensor, torch.Tensor]], index: int) -> tuple[torch.Tensor, list[tuple[torch.Tensor, torch.Tensor]]]:
+    def forward(self, encodings: torch.Tensor, kv_cache: Optional[list[tuple[torch.Tensor, torch.Tensor]]] = None, index: int = 0) -> Optional[tuple[torch.Tensor, list[tuple[torch.Tensor, torch.Tensor]]]]:
 
         embeddings = torch.nn.functional.dropout(self.wte(encodings), p = self.config.dropout_rate, training = self.training)
 
         for i, block in enumerate(self.blocks):
-            embeddings, kv_cache[i] = block.forward(embeddings, kv_cache[i], index)
+            if kv_cache is None:
+                embeddings, _ = block.forward(embeddings, None, index)
+            else:
+                embeddings, kv_cache[i] = block.forward(embeddings, kv_cache[i], index)
         
         embeddings = self.final_ln(embeddings)
 

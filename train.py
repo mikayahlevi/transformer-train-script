@@ -143,9 +143,6 @@ def train(settings, hyperparameters, model, dataset, tokenizer, device):
         ]
     )
 
-
-    kv_cache = model.get_empty_kv_cache(settings.batch_size, settings.sequence_length, device)
-
     
     train_loss_history = torch.empty(settings.total_steps // settings.log_major_every, device='cpu')
     val_loss_history = torch.empty(settings.total_steps // settings.log_major_every, device='cpu')
@@ -161,7 +158,7 @@ def train(settings, hyperparameters, model, dataset, tokenizer, device):
         
         inputs, labels = inputs.to(device), labels.to(device)
 
-        logits, _ = model(inputs, kv_cache, 0)
+        logits, _ = model(inputs)
 
         # flatten batch and sequence dimensions into one dimension for computing the loss
         loss = criterion(logits.flatten(-3, -2), labels.flatten(-2, -1))
@@ -245,7 +242,7 @@ def train(settings, hyperparameters, model, dataset, tokenizer, device):
                 
                     inputs, labels = inputs.to(device), labels.to(device)
 
-                    logits, _ = model(inputs, kv_cache, 0)
+                    logits, _ = model(inputs)
 
                     loss = criterion(logits.flatten(-3, -2), labels.flatten(-2, -1))
 
