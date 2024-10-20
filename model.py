@@ -168,7 +168,7 @@ class transformer_block(torch.nn.Module):
         incoming_values = self.value_layer(activation_norms).unflatten(-1, (self.block_config.n_attn_heads, self.value_head_size))
 
 
-        incoming_keys, incoming_values = self.position_embedding(incoming_keys, incoming_values, index, index + queries.size(-3))
+        queries, incoming_keys = self.position_embedding(queries, incoming_keys, index, index + queries.size(-3))
 
 
         (keys, values), mask = self.get_full_kv((incoming_keys, incoming_values), kv_cache, index)
