@@ -1,5 +1,5 @@
 {
-    "sequence_length": 512,
+    "sequence_length": 256,
     "batch_size": 64,
 
 
