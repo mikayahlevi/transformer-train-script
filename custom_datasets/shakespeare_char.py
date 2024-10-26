@@ -49,7 +49,7 @@ def get_dataset_and_tokenizer(sequence_length: int):
         ids = tokenizer.encode(text)
 
         train_to_val_ratio = 0.9
-        train_len = round(len(ids) * train_to_val_ratio)
+        train_len = int(len(ids) * train_to_val_ratio)
 
         train_ids = ids[:train_len]
         val_ids = ids[train_len:]
