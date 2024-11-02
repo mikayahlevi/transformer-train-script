@@ -64,39 +64,22 @@ class hyperparameter_config:
 
 
 
+def get_params_with_names(named_parameters, names: list[str]):
+    return [param for name, param in named_parameters if any(name in n for n in names)]
 
-
+def remove_params_with_names(named_parameters, names: list[str]):
+    return [param for name, param in named_parameters if not any(name in n for n in names)]
 
 def configure_optimizer(model, hyperparameters):
-    nodecay_params = [
-        # remove the names and just list the params
-        param for _, param in
-        # select the params with 'ln.weight' or 'wte.weight' in their name
-        list(filter(
-            lambda param: 'ln.weight' in param[0] or 'wte.weight' in param[0],
-            model.named_parameters()
-        ))
-    ]
-
-    # get all params then remove the nodecay params
-    decay_params = [
-        # remove the names and just list the params
-        param for _, param in
-        # filter out the params with 'ln.weight' or 'wte.weight' in their name
-        list(filter(
-            lambda param: 'ln.weight' not in param[0] and 'wte.weight' not in param[0],
-            model.named_parameters()
-        ))
-    ]
-
+    nodecay_param_names = ['ln.weight', 'wte.weight']
 
     optim_groups = [
         {
-            'params': decay_params,
+            'params': get_params_with_names(model.named_parameters(), ['ln.weight', 'wte.weight']),
             'weight_decay': hyperparameters.weight_decay
         },
         {
-            'params': nodecay_params,
+            'params': remove_params_with_names(model.named_parameters(), nodecay_param_names),
             'weight_decay': 0.0
         }
     ]
