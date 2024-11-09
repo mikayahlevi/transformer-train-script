@@ -107,8 +107,13 @@ def train(settings, hyperparameters, model, dataset, tokenizer, device):
 
     start = time.time()
 
-    train_dataloader = torch.utils.data.DataLoader(dataset['train'], batch_size = settings.batch_size, shuffle = True, pin_memory = True, pin_memory_device = device)
-    val_dataloader = torch.utils.data.DataLoader(dataset['validation'], batch_size = settings.batch_size, shuffle = True, pin_memory = True, pin_memory_device = device)
+    pin_device_args = {}
+    if device != 'cpu':
+        pin_device_args['pin_memory'] = True
+        pin_device_args['pin_memory_device'] = device
+
+    train_dataloader = torch.utils.data.DataLoader(dataset['train'], batch_size = settings.batch_size, shuffle = True, **pin_device_args)
+    val_dataloader = torch.utils.data.DataLoader(dataset['validation'], batch_size = settings.batch_size, shuffle = True, **pin_device_args)
 
 
     criterion = torch.nn.CrossEntropyLoss(reduction = 'mean')

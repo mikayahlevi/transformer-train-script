@@ -19,6 +19,7 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument('--device', type = str, default = 'cuda')
 parser.add_argument('--dataset', type = str, default = 'tiny_stories')
+parser.add_argument('--compile', type = bool, default = False)
 
 
 args = parser.parse_args()
@@ -79,8 +80,7 @@ if __name__ == '__main__':
 
     
 
-
-    model = transformer_network(modelcfg).to(args.device)
+    model = (torch.compile(transformer_network(modelcfg)) if args.compile else transformer_network(modelcfg)).to(args.device)
 
 
     print(colorama.Fore.BLUE)

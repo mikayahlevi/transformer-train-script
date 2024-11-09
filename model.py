@@ -32,7 +32,7 @@ class transformer_network_config:
 
 
 class xpos(torch.nn.Module):
-    def __init__(self, key_head_size: int, device = 'cuda', max_sequence_length: int = 1024):
+    def __init__(self, key_head_size: int, max_sequence_length: int = 1024):
         super(xpos, self).__init__()
 
         if key_head_size % 2 != 0:
@@ -41,7 +41,7 @@ class xpos(torch.nn.Module):
         theta_base = 10000
         alpha = 0.4 * key_head_size
 
-        drange = torch.arange(start = 2, end = key_head_size + 2, step = 2, dtype = torch.float32, device = device)
+        drange = torch.arange(start = 2, end = key_head_size + 2, step = 2, dtype = torch.float32)
         theta = torch.pow(1 / theta_base, drange / key_head_size).repeat_interleave(2)
         zeta = ((drange / (key_head_size / 2) + alpha) / (1 + alpha)).repeat_interleave(2)
         # no effect except for numerical stability
@@ -49,12 +49,12 @@ class xpos(torch.nn.Module):
         # no effect except for numerical stability
         half_max_sequence_length = max_sequence_length // 2
 
-        seq_range = torch.arange(- half_max_sequence_length, max_sequence_length - half_max_sequence_length, dtype = torch.float32, device = device).view(-1, 1, 1) / scale_base
+        seq_range = torch.arange(- half_max_sequence_length, max_sequence_length - half_max_sequence_length, dtype = torch.float32).view(-1, 1, 1) / scale_base
 
-        self.c = torch.cos(seq_range * theta.view(1, 1, -1))
-        self.s = torch.sin(seq_range * theta.view(1, 1, -1))
-        self.t = (zeta.view(1, 1, -1) ** seq_range)
-        self.invt = 1 / self.t
+        self.c = torch.nn.Parameter(torch.cos(seq_range * theta.view(1, 1, -1)), requires_grad=False)
+        self.s = torch.nn.Parameter(torch.sin(seq_range * theta.view(1, 1, -1)), requires_grad=False)
+        self.t = torch.nn.Parameter((zeta.view(1, 1, -1) ** seq_range), requires_grad=False)
+        self.invt = torch.nn.Parameter(1 / self.t, requires_grad=False)
 
 
 
@@ -113,7 +113,7 @@ class transformer_block(torch.nn.Module):
         self.attention_linear = torch.nn.Linear(block_config.value_size, block_config.hidden_size, bias = False)
         torch.nn.init.normal_(self.attention_linear.weight, mean = 0, std = 0.02 / math.sqrt(len(network_config.block_configs)))
 
-        self.position_embedding = xpos(self.key_head_size, device = 'cuda', max_sequence_length = network_config.max_sequence_length)
+        self.position_embedding = xpos(self.key_head_size, max_sequence_length = network_config.max_sequence_length)
     
 
     def get_full_kv(self, incoming_kv, kv_cache, index) -> tuple[tuple[torch.Tensor, torch.Tensor], Optional[torch.Tensor]]:
