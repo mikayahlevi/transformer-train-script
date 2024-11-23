@@ -78,7 +78,7 @@ def remove_params_with_names(named_parameters, names: list[str]):
         for name in names:
             if name in n:
                 name_in_n = True
-        if name_in_n = False:
+        if name_in_n == False:
             filtered_parameters += (n, p)
     return filtered_parameters
 
