@@ -61,12 +61,23 @@ class hyperparameter_config:
     weight_decay: float
 
 
-
 def get_params_with_names(named_parameters, names: list[str]):
-    return [param for name, param in named_parameters if any(name in n for n in names)]
+    filtered_parameters = []
+    for name in names:
+        for n, p in named_parameters:
+            if name in n:
+                filtered_parameters += p
+    return filtered_parameters
 
+    
 def remove_params_with_names(named_parameters, names: list[str]):
-    return [param for name, param in named_parameters if not any(name in n for n in names)]
+    filtered_parameters = []
+    for name in names:
+        for n, p in named_parameters:
+            if name not in n:
+                filtered_parameters += p
+    return filtered_parameters
+
 
 def configure_optimizer(model, hyperparameters):
     nodecay_param_names = ['ln.weight', 'wte.weight']
