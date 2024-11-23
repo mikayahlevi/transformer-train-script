@@ -183,7 +183,7 @@ def train(settings, hyperparameters, model, dataset, tokenizer, device):
             scheduler.step()
 
 
-        with torch.no_grad():
+        with torch.inference_mode():
             model.eval()
 
             # log information
