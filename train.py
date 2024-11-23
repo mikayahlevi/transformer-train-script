@@ -63,19 +63,23 @@ class hyperparameter_config:
 
 def get_params_with_names(named_parameters, names: list[str]):
     filtered_parameters = []
-    for name in names:
-        for n, p in named_parameters:
+    for n, p in named_parameters:
+        for name in names:
             if name in n:
-                filtered_parameters += p
+                filtered_parameters += (n, p)
+                break
     return filtered_parameters
 
     
 def remove_params_with_names(named_parameters, names: list[str]):
     filtered_parameters = []
-    for name in names:
-        for n, p in named_parameters:
-            if name not in n:
-                filtered_parameters += p
+    for n, p in named_parameters:
+        name_in_n = False
+        for name in names:
+            if name in n:
+                name_in_n = True
+        if name_in_n = False:
+            filtered_parameters += (n, p)
     return filtered_parameters
 
 
