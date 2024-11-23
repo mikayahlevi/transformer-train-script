@@ -66,7 +66,7 @@ def get_params_with_names(named_parameters, names: list[str]):
     for n, p in named_parameters:
         for name in names:
             if name in n:
-                filtered_parameters += (n, p)
+                filtered_parameters += p
                 break
     return filtered_parameters
 
@@ -79,7 +79,7 @@ def remove_params_with_names(named_parameters, names: list[str]):
             if name in n:
                 name_in_n = True
         if name_in_n == False:
-            filtered_parameters += (n, p)
+            filtered_parameters += p
     return filtered_parameters
 
 
@@ -96,6 +96,8 @@ def configure_optimizer(model, hyperparameters):
             'weight_decay': 0.0
         }
     ]
+
+    print(optim_groups)
 
     return torch.optim.AdamW(optim_groups, lr = hyperparameters.peak_lr, betas = hyperparameters.betas)
 
