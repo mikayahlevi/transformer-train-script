@@ -50,10 +50,10 @@ class xpos(torch.nn.Module):
 
         seq_range = torch.arange(- half_max_sequence_length, max_sequence_length - half_max_sequence_length, dtype = torch.float32).view(-1, 1, 1) / scale_base
 
-        self.c = torch.nn.Parameter(torch.cos(seq_range * theta.view(1, 1, -1)), requires_grad=False)
-        self.s = torch.nn.Parameter(torch.sin(seq_range * theta.view(1, 1, -1)), requires_grad=False)
-        self.t = torch.nn.Parameter((zeta.view(1, 1, -1) ** seq_range), requires_grad=False)
-        self.invt = torch.nn.Parameter(1 / self.t, requires_grad=False)
+        self.c = torch.nn.Buffer(torch.cos(seq_range * theta.view(1, 1, -1)))
+        self.s = torch.nn.Buffer(torch.sin(seq_range * theta.view(1, 1, -1)))
+        self.t = torch.nn.Buffer((zeta.view(1, 1, -1) ** seq_range))
+        self.invt = torch.nn.Buffer(1 / self.t)
 
 
 
