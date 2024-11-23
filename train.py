@@ -69,7 +69,7 @@ def remove_params_with_names(named_parameters, names: list[str]):
     return [param for name, param in named_parameters if not any(name in n for n in names)]
 
 def configure_optimizer(model, hyperparameters):
-    nodecay_param_names = ['ln.weight', 'wte.weight', 'lm_head_weights']
+    nodecay_param_names = ['ln.weight', 'wte.weight']
 
     optim_groups = [
         {
