@@ -121,13 +121,69 @@ class transformer_cache(torch.nn.Module):
 
 
 class transformer_attention(torch.nn.Module):
-    def __init__(self, key_size: int, value_size: int, max_sequence_length: int):
+    def __init__(self, config, max_sequence_length: int = 1024):
         super(transformer_attention, self).__init__()
 
-        self.key_size = key_size
-        self.value_size = value_size
 
-        self.position_embedding = xpos(key_size, max_sequence_length = max_sequence_length)
+        if config.key_size % config.n_attn_heads != 0:
+            raise ValueError("key size must be divisible by the number of attention heads")
+        self.key_head_size = config.key_size // config.n_attn_heads
+
+        if config.value_size % config.n_attn_heads != 0:
+            raise ValueError("value size must be divisible by the number of attention heads")
+        self.value_head_size = config.value_size // config.n_attn_heads
+
+
+        self.query_layer = torch.nn.Linear(config.embedding_size, config.key_size, bias = False)
+        self.key_layer = torch.nn.Linear(config.embedding_size, config.key_size, bias = False)
+        self.value_layer = torch.nn.Linear(config.embedding_size, config.value_size, bias = False)
+
+        torch.nn.init.normal_(self.query_layer.weight, mean = 0, std = 0.02)
+        torch.nn.init.normal_(self.key_layer.weight, mean = 0, std = 0.02)
+        torch.nn.init.normal_(self.value_layer.weight, mean = 0, std = 0.02)
+
+        self.attention_down = torch.nn.Linear(config.value_size, config.embedding_size, bias = False)
+        torch.nn.init.normal_(self.attention_down.weight, mean = 0, std = 0.02 / math.sqrt(config.n_blocks))
+
+
+        self.position_embedding = xpos(self.key_head_size, max_sequence_length = max_sequence_length)
+
+    def forward(self, activations: torch.Tensor, cache: Optional[transformer_cache]) -> torch.Tensor:
+        use_cache = cache is not None
+
+        queries = self.query_layer(activations).unflatten(-1, (self.config.n_attn_heads, self.key_head_size))
+
+        keys = self.key_layer(activations).unflatten(-1, (self.config.n_attn_heads, self.key_head_size))
+        values = self.value_layer(activations).unflatten(-1, (self.config.n_attn_heads, self.value_head_size))
+
+
+        queries, incoming_keys = self.position_embedding(queries, incoming_keys, cache.last_position, cache.current_position)
+
+
+        mask_kwarg = {}
+        if use_cache:
+            mask_kwarg['mask'] = cache.get_mask()
+            cache.append_keys(keys, self.block_number)
+            cache.append_values(values, self.block_number)
+
+        # transpose to switch the sequence and head dimensions
+        attention = torch.nn.functional.scaled_dot_product_attention(
+            queries.transpose(-3, -2),
+            cache.get_full_keys(self.block_number) if use_cache else keys.transpose(-3, -2),
+            cache.get_full_values(self.block_number) if use_cache else values.transpose(-3, -2),
+            is_causal = not use_cache,
+            dropout_p = self.config.dropout_rate if self.training else 0.0,
+            **mask_kwarg
+        ).transpose(-3, -2)
+
+
+        return torch.nn.functional.dropout(
+            self.attention_down(
+                attention.flatten(-2)
+            ), 
+            p = self.config.dropout_rate,
+            training = self.training
+        )
     
 
 
@@ -143,16 +199,6 @@ class transformer_block(torch.nn.Module):
         self.block_number = block_number
 
 
-        if config.key_size % config.n_attn_heads != 0:
-            raise ValueError("key size must be divisible by the number of attention heads")
-        self.key_head_size = config.key_size // config.n_attn_heads
-
-        if config.value_size % config.n_attn_heads != 0:
-            raise ValueError("value size must be divisible by the number of attention heads")
-        self.value_head_size = config.value_size // config.n_attn_heads
-
-
-
         self.first_ln = torch.nn.LayerNorm(config.embedding_size, bias = False)
         self.second_ln = torch.nn.LayerNorm(config.embedding_size, bias = False)
 
@@ -165,99 +211,12 @@ class transformer_block(torch.nn.Module):
         torch.nn.init.normal_(self.mlp[0].weight, mean = 0, std = 0.02)
         torch.nn.init.normal_(self.mlp[2].weight, mean = 0, std = 0.02 / math.sqrt(config.n_blocks))
 
-
-        self.query_layer = torch.nn.Linear(config.embedding_size, config.key_size, bias = False)
-        self.key_layer = torch.nn.Linear(config.embedding_size, config.key_size, bias = False)
-        self.value_layer = torch.nn.Linear(config.embedding_size, config.value_size, bias = False)
-
-        torch.nn.init.normal_(self.query_layer.weight, mean = 0, std = 0.02)
-        torch.nn.init.normal_(self.key_layer.weight, mean = 0, std = 0.02)
-        torch.nn.init.normal_(self.value_layer.weight, mean = 0, std = 0.02)
-
-        self.attention_down = torch.nn.Linear(config.value_size, config.embedding_size, bias = False)
-        torch.nn.init.normal_(self.attention_down.weight, mean = 0, std = 0.02 / math.sqrt(config.n_blocks))
-
-        self.position_embedding = xpos(self.key_head_size, max_sequence_length = config.max_sequence_length)
-    
-
-    def get_full_kv(self, incoming_kv, kv_cache, index) -> tuple[tuple[torch.Tensor, torch.Tensor], Optional[torch.Tensor]]:
-        if kv_cache is None:
-            return incoming_kv, None
-        else:
-            incoming_keys, incoming_values = incoming_kv
-            cache_keys, cache_values = kv_cache
-
-            incoming_sequence_length = incoming_keys.size(-3)
-            cache_sequence_length = index
-            total_sequence_length = incoming_sequence_length + cache_sequence_length
-            max_sequence_length = cache_keys.size(-3)
-
-            if total_sequence_length > max_sequence_length:
-                raise ValueError("total sequence length is larger than the maximum sequence length of the cache")
-            elif total_sequence_length == max_sequence_length and index == 0:
-                return (incoming_keys, incoming_values), None
-            elif total_sequence_length == max_sequence_length:
-                keys = torch.cat((cache_keys[..., :cache_sequence_length, :, :], incoming_keys), dim = -3)
-                values = torch.cat((cache_values[..., :cache_sequence_length, :, :], incoming_values), dim = -3)
-
-                mask = torch.ones((incoming_sequence_length, total_sequence_length), dtype=torch.bool, device = keys.device).tril(total_sequence_length - incoming_sequence_length)
-
-                return (keys, values), mask
-            elif index == 0:
-                cache_keys[..., :incoming_sequence_length, :, :] = incoming_keys
-                cache_values[..., :incoming_sequence_length, :, :] = incoming_values
-
-                return (incoming_keys, incoming_values), None
-            else:
-
-                keys = torch.cat((cache_keys[..., :cache_sequence_length, :, :], incoming_keys), dim = -3)
-                values = torch.cat((cache_values[..., :cache_sequence_length, :, :], incoming_values), dim = -3)
-
-                cache_keys[..., cache_sequence_length:total_sequence_length, :, :] = incoming_keys
-                cache_values[..., cache_sequence_length:total_sequence_length, :, :] = incoming_values
-
-                # custom mask so that it can pay attention to the cached tokens
-                mask = torch.ones((incoming_sequence_length, total_sequence_length), dtype=torch.bool, device = keys.device).tril(total_sequence_length - incoming_sequence_length)
-
-                return (keys, values), mask
-
+        self.attention = transformer_attention(config)
 
     
     def forward(self, activations: torch.Tensor, cache: Optional[transformer_cache]) = None -> torch.Tensor:
-        activation_norms = self.first_ln(activations)
-
-        queries = self.query_layer(activation_norms).unflatten(-1, (self.config.n_attn_heads, self.key_head_size))
-
-        incoming_keys = self.key_layer(activation_norms).unflatten(-1, (self.config.n_attn_heads, self.key_head_size))
-        incoming_values = self.value_layer(activation_norms).unflatten(-1, (self.config.n_attn_heads, self.value_head_size))
-
-
-        queries, incoming_keys = self.position_embedding(queries, incoming_keys, cache.last_position, cache.current_position)
-
-
-        (keys, values), mask = self.get_full_kv((incoming_keys, incoming_values), kv_cache, index)
-
-        # transpose to switch the sequence and head dimensions
-        attention = torch.nn.functional.scaled_dot_product_attention(
-            queries.transpose(-3, -2),
-            keys.transpose(-3, -2),
-            values.transpose(-3, -2),
-            is_causal = (mask is None),
-            dropout_p = self.config.dropout_rate if self.training else 0.0,
-            attn_mask = mask
-        ).transpose(-3, -2)
-
-
-        activations = activations + torch.nn.functional.dropout(
-            self.attention_down(
-                attention.flatten(-2)
-            ), 
-            p = self.config.dropout_rate,
-            training = self.training
-        )
-
+        activations = activations + self.attention(self.first_ln(activations), cache)
         activations = activations + self.mlp(self.second_ln(activations))
-
         return activations
 
 
