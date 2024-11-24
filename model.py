@@ -68,15 +68,9 @@ class xpos(torch.nn.Module):
 
         return queries, keys
 
-
-class transformer_block(torch.nn.Module):
+class attention(torch.nn.Module):
     def __init__(self, network_config: transformer_network_config, block_config: transformer_block_config):
-        super(transformer_block, self).__init__()
-
-        self.block_config = block_config
-        self.network_config = network_config
-
-
+        super(attention, self).__init__()
 
         if block_config.key_size % block_config.n_attn_heads != 0:
             raise ValueError("key size must be divisible by the number of attention heads")
@@ -85,20 +79,6 @@ class transformer_block(torch.nn.Module):
         if block_config.value_size % block_config.n_attn_heads != 0:
             raise ValueError("value size must be divisible by the number of attention heads")
         self.value_head_size = block_config.value_size // block_config.n_attn_heads
-
-
-
-        self.first_ln = torch.nn.LayerNorm(network_config.embedding_size, bias = False)
-        self.second_ln = torch.nn.LayerNorm(network_config.embedding_size, bias = False)
-
-        self.mlp = torch.nn.Sequential(
-            torch.nn.Linear(network_config.embedding_size, network_config.embedding_size * 4, bias = False),
-            torch.nn.GELU(),
-            torch.nn.Linear(network_config.embedding_size * 4, network_config.embedding_size, bias = False)
-        )
-
-        torch.nn.init.normal_(self.mlp[0].weight, mean = 0, std = 0.02)
-        torch.nn.init.normal_(self.mlp[2].weight, mean = 0, std = 0.02 / math.sqrt(len(network_config.block_configs)))
 
 
         self.query_layer = torch.nn.Linear(network_config.embedding_size, block_config.key_size, bias = False)
@@ -113,7 +93,7 @@ class transformer_block(torch.nn.Module):
         torch.nn.init.normal_(self.attention_down.weight, mean = 0, std = 0.02 / math.sqrt(len(network_config.block_configs)))
 
         self.position_embedding = xpos(self.key_head_size, max_sequence_length = network_config.max_sequence_length)
-    
+
 
     def get_full_kv(self, incoming_kv, kv_cache, index) -> tuple[tuple[torch.Tensor, torch.Tensor], Optional[torch.Tensor]]:
         if kv_cache is None:
@@ -155,16 +135,13 @@ class transformer_block(torch.nn.Module):
                 mask = torch.ones((incoming_sequence_length, total_sequence_length), dtype=torch.bool, device = keys.device).tril(total_sequence_length - incoming_sequence_length)
 
                 return (keys, values), mask
+            
 
-
-    
     def forward(self, activations: torch.Tensor, kv_cache: Optional[tuple[torch.Tensor, torch.Tensor]], index) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
-        activation_norms = self.first_ln(activations)
+        queries = self.query_layer(activations).unflatten(-1, (self.block_config.n_attn_heads, self.key_head_size))
 
-        queries = self.query_layer(activation_norms).unflatten(-1, (self.block_config.n_attn_heads, self.key_head_size))
-
-        incoming_keys = self.key_layer(activation_norms).unflatten(-1, (self.block_config.n_attn_heads, self.key_head_size))
-        incoming_values = self.value_layer(activation_norms).unflatten(-1, (self.block_config.n_attn_heads, self.value_head_size))
+        incoming_keys = self.key_layer(activations).unflatten(-1, (self.block_config.n_attn_heads, self.key_head_size))
+        incoming_values = self.value_layer(activations).unflatten(-1, (self.block_config.n_attn_heads, self.value_head_size))
 
 
         queries, incoming_keys = self.position_embedding(queries, incoming_keys, index, index + queries.size(-3))
@@ -183,7 +160,7 @@ class transformer_block(torch.nn.Module):
         ).transpose(-3, -2)
 
 
-        activations = activations + torch.nn.functional.dropout(
+        return torch.nn.functional.dropout(
             self.attention_down(
                 attention.flatten(-2)
             ), 
@@ -191,6 +168,32 @@ class transformer_block(torch.nn.Module):
             training = self.training
         )
 
+
+
+class transformer_block(torch.nn.Module):
+    def __init__(self, network_config: transformer_network_config, block_config: transformer_block_config):
+        super(transformer_block, self).__init__()
+
+        self.block_config = block_config
+        self.network_config = network_config
+
+        self.first_ln = torch.nn.LayerNorm(network_config.embedding_size, bias = False)
+        self.second_ln = torch.nn.LayerNorm(network_config.embedding_size, bias = False)
+
+        self.mlp = torch.nn.Sequential(
+            torch.nn.Linear(network_config.embedding_size, network_config.embedding_size * 4, bias = False),
+            torch.nn.GELU(),
+            torch.nn.Linear(network_config.embedding_size * 4, network_config.embedding_size, bias = False)
+        )
+
+        torch.nn.init.normal_(self.mlp[0].weight, mean = 0, std = 0.02)
+        torch.nn.init.normal_(self.mlp[2].weight, mean = 0, std = 0.02 / math.sqrt(len(network_config.block_configs)))
+
+        self.attention = attention(network_config, block_config)
+
+    
+    def forward(self, activations: torch.Tensor, kv_cache: Optional[tuple[torch.Tensor, torch.Tensor]], index) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
+        activations = activations + self.attention(activations, kv_cache, index)
         activations = activations + self.mlp(self.second_ln(activations))
 
         return activations, kv_cache
