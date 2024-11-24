@@ -10,7 +10,10 @@ from dataclasses import dataclass
 class transformer_network_config:
     vocab_size: int
     
+    
     embedding_size: int
+
+    dropout_rate: float
 
 
     n_attn_heads: int
@@ -20,10 +23,8 @@ class transformer_network_config:
 
 
     max_sequence_length: int
-
-
-    dropout_rate: float
     
+
     n_blocks: int
 
 
