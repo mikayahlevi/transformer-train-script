@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
     
 @dataclass
-class transformer_config, block_number: int:
+class transformer_config:
     vocab_size: int
     
     
@@ -159,10 +159,10 @@ class transformer_block(torch.nn.Module):
     def forward(self, activations: torch.Tensor, kv_cache: Optional[tuple[torch.Tensor, torch.Tensor]], index) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
         activation_norms = self.first_ln(activations)
 
-        queries = self.query_layer(activation_norms).unflatten(-1, (self.block_config.n_attn_heads, self.key_head_size))
+        queries = self.query_layer(activation_norms).unflatten(-1, (self.config.n_attn_heads, self.key_head_size))
 
-        incoming_keys = self.key_layer(activation_norms).unflatten(-1, (self.block_config.n_attn_heads, self.key_head_size))
-        incoming_values = self.value_layer(activation_norms).unflatten(-1, (self.block_config.n_attn_heads, self.value_head_size))
+        incoming_keys = self.key_layer(activation_norms).unflatten(-1, (self.config.n_attn_heads, self.key_head_size))
+        incoming_values = self.value_layer(activation_norms).unflatten(-1, (self.config.n_attn_heads, self.value_head_size))
 
 
         queries, incoming_keys = self.position_embedding(queries, incoming_keys, index, index + queries.size(-3))
@@ -176,7 +176,7 @@ class transformer_block(torch.nn.Module):
             keys.transpose(-3, -2),
             values.transpose(-3, -2),
             is_causal = (mask is None),
-            dropout_p = self.network_config.dropout_rate if self.training else 0.0,
+            dropout_p = self.config.dropout_rate if self.training else 0.0,
             attn_mask = mask
         ).transpose(-3, -2)
 
@@ -185,7 +185,7 @@ class transformer_block(torch.nn.Module):
             self.attention_down(
                 attention.flatten(-2)
             ), 
-            p = self.network_config.dropout_rate,
+            p = self.config.dropout_rate,
             training = self.training
         )
 
@@ -198,13 +198,13 @@ class transformer_block(torch.nn.Module):
 
     
 class transformer_network(torch.nn.Module):
-    def __init__(self, config: transformer_config, block_number: int):
+    def __init__(self, config: transformer_config):
         super(transformer_network, self).__init__()
 
         self.config = config
 
         
-        self.blocks = torch.nn.ModuleList([transformer_block(config, block_config) for block_config in config.block_configs])
+        self.blocks = torch.nn.ModuleList([transformer_block(config, block_number) for block_number in range(config.n_blocks)])
         
         
         self.wte = torch.nn.Embedding(config.vocab_size, config.embedding_size)
@@ -236,7 +236,7 @@ class transformer_network(torch.nn.Module):
     def get_empty_kv_cache(self, batch_size: int, sequence_length: int, device) -> list[tuple[torch.Tensor, torch.Tensor]]:
         return ([
             (
-                torch.empty(batch_size, sequence_length, block.block_config.n_attn_heads, block.key_head_size, device = device).squeeze(-4),
-                torch.empty(batch_size, sequence_length, block.block_config.n_attn_heads, block.value_head_size, device = device).squeeze(-4)
+                torch.empty(batch_size, sequence_length, self.config.n_attn_heads, block.key_head_size, device = device).squeeze(-4),
+                torch.empty(batch_size, sequence_length, self.config.n_attn_heads, block.value_head_size, device = device).squeeze(-4)
             )
         for block in self.blocks])
