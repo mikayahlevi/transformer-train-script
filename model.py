@@ -69,30 +69,31 @@ class xpos(torch.nn.Module):
         return queries, keys
 
 class attention(torch.nn.Module):
-    def __init__(self, network_config: transformer_network_config, block_config: transformer_block_config):
+    def __init__(self, embedding_size: int, key_size: int, value_size: int, n_attn_heads: int, max_sequence_length: int, n_blocks: int, dropout_rate: float):
         super(attention, self).__init__()
 
-        if block_config.key_size % block_config.n_attn_heads != 0:
+        self.n_attn_heads = n_attn_heads
+        if key_size % n_attn_heads != 0:
             raise ValueError("key size must be divisible by the number of attention heads")
-        self.key_head_size = block_config.key_size // block_config.n_attn_heads
+        self.key_head_size = key_size // n_attn_heads
 
-        if block_config.value_size % block_config.n_attn_heads != 0:
+        if value_size % n_attn_heads != 0:
             raise ValueError("value size must be divisible by the number of attention heads")
-        self.value_head_size = block_config.value_size // block_config.n_attn_heads
+        self.value_head_size = value_size // n_attn_heads
 
 
-        self.query_layer = torch.nn.Linear(network_config.embedding_size, block_config.key_size, bias = False)
-        self.key_layer = torch.nn.Linear(network_config.embedding_size, block_config.key_size, bias = False)
-        self.value_layer = torch.nn.Linear(network_config.embedding_size, block_config.value_size, bias = False)
+        self.query_layer = torch.nn.Linear(embedding_size, key_size, bias = False)
+        self.key_layer = torch.nn.Linear(embedding_size, key_size, bias = False)
+        self.value_layer = torch.nn.Linear(embedding_size, value_size, bias = False)
 
         torch.nn.init.normal_(self.query_layer.weight, mean = 0, std = 0.02)
         torch.nn.init.normal_(self.key_layer.weight, mean = 0, std = 0.02)
         torch.nn.init.normal_(self.value_layer.weight, mean = 0, std = 0.02)
 
-        self.attention_down = torch.nn.Linear(block_config.value_size, network_config.embedding_size, bias = False)
-        torch.nn.init.normal_(self.attention_down.weight, mean = 0, std = 0.02 / math.sqrt(len(network_config.block_configs)))
+        self.attention_down = torch.nn.Linear(value_size, embedding_size, bias = False)
+        torch.nn.init.normal_(self.attention_down.weight, mean = 0, std = 0.02 / math.sqrt(n_blocks))
 
-        self.position_embedding = xpos(self.key_head_size, max_sequence_length = network_config.max_sequence_length)
+        self.position_embedding = xpos(self.key_head_size, max_sequence_length = max_sequence_length)
 
 
     def get_full_kv(self, incoming_kv, kv_cache, index) -> tuple[tuple[torch.Tensor, torch.Tensor], Optional[torch.Tensor]]:
@@ -138,10 +139,10 @@ class attention(torch.nn.Module):
             
 
     def forward(self, activations: torch.Tensor, kv_cache: Optional[tuple[torch.Tensor, torch.Tensor]], index) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
-        queries = self.query_layer(activations).unflatten(-1, (self.block_config.n_attn_heads, self.key_head_size))
+        queries = self.query_layer(activations).unflatten(-1, (self.n_attn_heads, self.key_head_size))
 
-        incoming_keys = self.key_layer(activations).unflatten(-1, (self.block_config.n_attn_heads, self.key_head_size))
-        incoming_values = self.value_layer(activations).unflatten(-1, (self.block_config.n_attn_heads, self.value_head_size))
+        incoming_keys = self.key_layer(activations).unflatten(-1, (self.n_attn_heads, self.key_head_size))
+        incoming_values = self.value_layer(activations).unflatten(-1, (self.n_attn_heads, self.value_head_size))
 
 
         queries, incoming_keys = self.position_embedding(queries, incoming_keys, index, index + queries.size(-3))
@@ -155,7 +156,7 @@ class attention(torch.nn.Module):
             keys.transpose(-3, -2),
             values.transpose(-3, -2),
             is_causal = (mask is None),
-            dropout_p = self.network_config.dropout_rate if self.training else 0.0,
+            dropout_p = self.dropout_rate if self.training else 0.0,
             attn_mask = mask
         ).transpose(-3, -2)
 
@@ -164,7 +165,7 @@ class attention(torch.nn.Module):
             self.attention_down(
                 attention.flatten(-2)
             ), 
-            p = self.network_config.dropout_rate,
+            p = self.dropout_rate,
             training = self.training
         )
 
@@ -189,7 +190,15 @@ class transformer_block(torch.nn.Module):
         torch.nn.init.normal_(self.mlp[0].weight, mean = 0, std = 0.02)
         torch.nn.init.normal_(self.mlp[2].weight, mean = 0, std = 0.02 / math.sqrt(len(network_config.block_configs)))
 
-        self.attention = attention(network_config, block_config)
+        self.attention = attention(
+            network_config.embedding_size,
+            block_config.key_size,
+            block_config.value_size,
+            block_config.n_attn_heads,
+            network_config.max_sequence_length,
+            len(network_config.block_configs),
+            network_config.dropout_rate
+        )
 
     
     def forward(self, activations: torch.Tensor, kv_cache: Optional[tuple[torch.Tensor, torch.Tensor]], index) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
