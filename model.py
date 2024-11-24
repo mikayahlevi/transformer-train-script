@@ -223,7 +223,7 @@ class transformer_block(torch.nn.Module):
 
 
     
-    def forward(self, activations: torch.Tensor, kv_cache: Optional[tuple[torch.Tensor, torch.Tensor]], index) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
+    def forward(self, activations: torch.Tensor, cache: Optional[transformer_cache]) = None -> torch.Tensor:
         activation_norms = self.first_ln(activations)
 
         queries = self.query_layer(activation_norms).unflatten(-1, (self.config.n_attn_heads, self.key_head_size))
@@ -232,7 +232,7 @@ class transformer_block(torch.nn.Module):
         incoming_values = self.value_layer(activation_norms).unflatten(-1, (self.config.n_attn_heads, self.value_head_size))
 
 
-        queries, incoming_keys = self.position_embedding(queries, incoming_keys, index, index + queries.size(-3))
+        queries, incoming_keys = self.position_embedding(queries, incoming_keys, cache.last_position, cache.current_position)
 
 
         (keys, values), mask = self.get_full_kv((incoming_keys, incoming_values), kv_cache, index)
@@ -258,7 +258,7 @@ class transformer_block(torch.nn.Module):
 
         activations = activations + self.mlp(self.second_ln(activations))
 
-        return activations, kv_cache
+        return activations
 
 
 
@@ -283,27 +283,19 @@ class transformer_network(torch.nn.Module):
         self.lm_head.weight = self.wte.weight
 
     # index should start at 0
-    def forward(self, encodings: torch.Tensor, kv_cache: Optional[list[tuple[torch.Tensor, torch.Tensor]]] = None, index: int = 0) -> Optional[tuple[torch.Tensor, list[tuple[torch.Tensor, torch.Tensor]]]]:
+    def forward(self, encodings: torch.Tensor, cache: Optional[transformer_cache] = None) -> torch.Tensor:
+        embeddings = torch.nn.functional.dropout(
+            self.wte(encodings),
+            p = self.config.dropout_rate,
+            training = self.training
+        )
 
-        embeddings = torch.nn.functional.dropout(self.wte(encodings), p = self.config.dropout_rate, training = self.training)
+        cache.increment_position(embeddings.size(-2))
 
-        for i, block in enumerate(self.blocks):
-            if kv_cache is None:
-                embeddings, _ = block.forward(embeddings, None, index)
-            else:
-                embeddings, kv_cache[i] = block.forward(embeddings, kv_cache[i], index)
+        for block in self.blocks:
+            embeddings = block(embeddings, cache)
         
         embeddings = self.final_ln(embeddings)
-
         logits = self.lm_head(embeddings)
 
-        return logits, kv_cache  
-        
-    
-    def get_empty_kv_cache(self, batch_size: int, sequence_length: int, device) -> list[tuple[torch.Tensor, torch.Tensor]]:
-        return ([
-            (
-                torch.empty(batch_size, sequence_length, self.config.n_attn_heads, block.key_head_size, device = device).squeeze(-4),
-                torch.empty(batch_size, sequence_length, self.config.n_attn_heads, block.value_head_size, device = device).squeeze(-4)
-            )
-        for block in self.blocks])
+        return logits  
