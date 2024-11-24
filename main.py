@@ -11,7 +11,7 @@ from typing import Optional
 import dataclasses
 
 
-from model import transformer_network, transformer_network_config, transformer_block_config
+from model import transformer_network, transformer_network_config, transformer_block_config, transformer_attention_config
 from train import train, train_config, hyperparameter_config
 
 
@@ -52,7 +52,10 @@ if __name__ == '__main__':
     with open(os.path.join(args.config_path, 'modelcfg.json'), 'r') as f:
         # set the model's vocab size to the dataset's vocab size
         modelcfg_dict = json.load(f)
-        block_configs = [transformer_block_config(**block) for block in modelcfg_dict.pop('block_configs')]
+        block_configs = []
+        for block in modelcfg_dict.pop('block_configs'):
+            attention_config = transformer_attention_config(**block.pop('attention_config'))
+            block_configs.append(transformer_block_config(**block, attention_config = attention_config))
         modelcfg = transformer_network_config(**modelcfg_dict, block_configs = block_configs, vocab_size = tokenizer.get_vocab_size())
 
 
