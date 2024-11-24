@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
     
 @dataclass
-class transformer_network_config:
+class transformer_config, block_number: int:
     vocab_size: int
     
     
@@ -69,49 +69,48 @@ class xpos(torch.nn.Module):
 
 
 class transformer_block(torch.nn.Module):
-    def __init__(self, network_config: transformer_network_config, block_config: transformer_block_config):
+    def __init__(self, config: transformer_config, block_number: int):
         super(transformer_block, self).__init__()
 
-        self.block_config = block_config
-        self.network_config = network_config
+        self.config = config
 
 
 
-        if block_config.key_size % block_config.n_attn_heads != 0:
+        if config.key_size % config.n_attn_heads != 0:
             raise ValueError("key size must be divisible by the number of attention heads")
-        self.key_head_size = block_config.key_size // block_config.n_attn_heads
+        self.key_head_size = config.key_size // config.n_attn_heads
 
-        if block_config.value_size % block_config.n_attn_heads != 0:
+        if config.value_size % config.n_attn_heads != 0:
             raise ValueError("value size must be divisible by the number of attention heads")
-        self.value_head_size = block_config.value_size // block_config.n_attn_heads
+        self.value_head_size = config.value_size // config.n_attn_heads
 
 
 
-        self.first_ln = torch.nn.LayerNorm(network_config.embedding_size, bias = False)
-        self.second_ln = torch.nn.LayerNorm(network_config.embedding_size, bias = False)
+        self.first_ln = torch.nn.LayerNorm(config.embedding_size, bias = False)
+        self.second_ln = torch.nn.LayerNorm(config.embedding_size, bias = False)
 
         self.mlp = torch.nn.Sequential(
-            torch.nn.Linear(network_config.embedding_size, network_config.embedding_size * 4, bias = False),
+            torch.nn.Linear(config.embedding_size, config.embedding_size * 4, bias = False),
             torch.nn.GELU(),
-            torch.nn.Linear(network_config.embedding_size * 4, network_config.embedding_size, bias = False)
+            torch.nn.Linear(config.embedding_size * 4, config.embedding_size, bias = False)
         )
 
         torch.nn.init.normal_(self.mlp[0].weight, mean = 0, std = 0.02)
-        torch.nn.init.normal_(self.mlp[2].weight, mean = 0, std = 0.02 / math.sqrt(len(network_config.block_configs)))
+        torch.nn.init.normal_(self.mlp[2].weight, mean = 0, std = 0.02 / math.sqrt(config.n_blocks))
 
 
-        self.query_layer = torch.nn.Linear(network_config.embedding_size, block_config.key_size, bias = False)
-        self.key_layer = torch.nn.Linear(network_config.embedding_size, block_config.key_size, bias = False)
-        self.value_layer = torch.nn.Linear(network_config.embedding_size, block_config.value_size, bias = False)
+        self.query_layer = torch.nn.Linear(config.embedding_size, config.key_size, bias = False)
+        self.key_layer = torch.nn.Linear(config.embedding_size, config.key_size, bias = False)
+        self.value_layer = torch.nn.Linear(config.embedding_size, config.value_size, bias = False)
 
         torch.nn.init.normal_(self.query_layer.weight, mean = 0, std = 0.02)
         torch.nn.init.normal_(self.key_layer.weight, mean = 0, std = 0.02)
         torch.nn.init.normal_(self.value_layer.weight, mean = 0, std = 0.02)
 
-        self.attention_down = torch.nn.Linear(block_config.value_size, network_config.embedding_size, bias = False)
-        torch.nn.init.normal_(self.attention_down.weight, mean = 0, std = 0.02 / math.sqrt(len(network_config.block_configs)))
+        self.attention_down = torch.nn.Linear(config.value_size, config.embedding_size, bias = False)
+        torch.nn.init.normal_(self.attention_down.weight, mean = 0, std = 0.02 / math.sqrt(config.n_blocks))
 
-        self.position_embedding = xpos(self.key_head_size, max_sequence_length = network_config.max_sequence_length)
+        self.position_embedding = xpos(self.key_head_size, max_sequence_length = config.max_sequence_length)
     
 
     def get_full_kv(self, incoming_kv, kv_cache, index) -> tuple[tuple[torch.Tensor, torch.Tensor], Optional[torch.Tensor]]:
@@ -199,7 +198,7 @@ class transformer_block(torch.nn.Module):
 
     
 class transformer_network(torch.nn.Module):
-    def __init__(self, config: transformer_network_config):
+    def __init__(self, config: transformer_config, block_number: int):
         super(transformer_network, self).__init__()
 
         self.config = config
