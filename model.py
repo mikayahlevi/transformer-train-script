@@ -93,6 +93,9 @@ class attention(torch.nn.Module):
         self.attention_down = torch.nn.Linear(value_size, embedding_size, bias = False)
         torch.nn.init.normal_(self.attention_down.weight, mean = 0, std = 0.02 / math.sqrt(n_blocks))
 
+
+        self.dropout_rate = dropout_rate
+
         self.position_embedding = xpos(self.key_head_size, max_sequence_length = max_sequence_length)
 
 
@@ -250,7 +253,7 @@ class transformer_network(torch.nn.Module):
     def get_empty_kv_cache(self, batch_size: int, sequence_length: int, device) -> list[tuple[torch.Tensor, torch.Tensor]]:
         return ([
             (
-                torch.empty(batch_size, sequence_length, block.block_config.n_attn_heads, block.key_head_size, device = device).squeeze(-4),
-                torch.empty(batch_size, sequence_length, block.block_config.n_attn_heads, block.value_head_size, device = device).squeeze(-4)
+                torch.empty(batch_size, sequence_length, block.block_config.n_attn_heads, block.attention.key_head_size, device = device).squeeze(-4),
+                torch.empty(batch_size, sequence_length, block.block_config.n_attn_heads, block.attention.value_head_size, device = device).squeeze(-4)
             )
         for block in self.blocks])
