@@ -177,7 +177,7 @@ class attention(torch.nn.Module):
         torch.nn.init.normal_(self.value_layer.weight, mean = 0, std = 0.02)
 
         self.attention_down = torch.nn.Linear(config.value_size, network_config.embedding_size, bias = False)
-        torch.nn.init.normal_(self.attention_down.weight, mean = 0, std = 0.02 / math.sqrt(len(network_config.blocks)))
+        torch.nn.init.normal_(self.attention_down.weight, mean = 0, std = 0.02 / math.sqrt(len(network_config.blocks_configs)))
 
 
         self.dropout_rate = config.dropout_rate
