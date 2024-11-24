@@ -6,27 +6,25 @@ from typing import Optional
 from dataclasses import dataclass
 
     
-
-
 @dataclass
-class transformer_block_config:
+class transformer_network_config:
+    vocab_size: int
+    
+    embedding_size: int
+
+
     n_attn_heads: int
 
     key_size: int
     value_size: int
 
 
+    max_sequence_length: int
 
-@dataclass
-class transformer_network_config:
-    vocab_size: int
-    embedding_size: int
 
     dropout_rate: float
-
-    max_sequence_length: int
     
-    block_configs: list[transformer_block_config]
+    n_blocks: int
 
 
 
