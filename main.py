@@ -51,9 +51,7 @@ if __name__ == '__main__':
 
     with open(os.path.join(args.config_path, 'modelcfg.json'), 'r') as f:
         # set the model's vocab size to the dataset's vocab size
-        modelcfg_dict = json.load(f)
-        block_configs = [transformer_block_config(**block) for block in modelcfg_dict.pop('block_configs')]
-        modelcfg = transformer_network_config(**modelcfg_dict, block_configs = block_configs, vocab_size = tokenizer.get_vocab_size())
+        modelcfg = transformer_network_config(**json.load(f), vocab_size = tokenizer.get_vocab_size())
 
 
     # create the path to log the info and dump the configs as jsons
