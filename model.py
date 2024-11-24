@@ -94,8 +94,8 @@ class transformer_cache(torch.nn.Module):
             torch.empty(
                 *proceeding_dimensions,
                 max_sequence_length,
-                block_config.attention_config.n_attn_heads,
-                block_config.attention_config.key_size // block_config.attention_config.n_attn_heads,
+                block_config.attention_config.n_heads,
+                block_config.attention_config.key_size // block_config.attention_config.n_heads,
                 **self.device_kwarg
             ),
         ) for block_config in network_config.block_configs]
@@ -104,8 +104,8 @@ class transformer_cache(torch.nn.Module):
             torch.empty(
                 *proceeding_dimensions,
                 max_sequence_length,
-                block_config.n_attn_heads,
-                block_config.value_size // block_config.n_attn_heads,
+                block_config.attention_config.n_heads,
+                block_config.attention_config.value_size // block_config.attention_config.n_heads,
                 **self.device_kwarg
             )
         ) for block_config in network_config.block_configs]
@@ -116,6 +116,10 @@ class transformer_cache(torch.nn.Module):
 
         if self.current_position > self.max_sequence_length:
             raise ValueError("total sequence length is larger than the maximum sequence length of the cache")
+        
+    def reset(self):
+        self.last_position = 0
+        self.current_position = 0
 
     def get_past_keys(self, block_number):
         if self.last_position == 0:
@@ -185,7 +189,7 @@ class attention(torch.nn.Module):
         self.position_embedding = xpos(self.key_head_size, max_sequence_length = network_config.max_sequence_length)
             
 
-    def forward(self, activations: torch.Tensor, cache: Optional[transformer_cache]) -> torch.Tensor:
+    def forward(self, activations: torch.Tensor, cache: Optional[transformer_cache] = None) -> torch.Tensor:
         use_cache = not (cache is None)
 
         queries = self.query_layer(activations).unflatten(-1, (self.n_heads, self.key_head_size))
@@ -194,11 +198,15 @@ class attention(torch.nn.Module):
         values = self.value_layer(activations).unflatten(-1, (self.n_heads, self.value_head_size))
 
 
-        queries, keys = self.position_embedding(queries, keys, cache.last_position, cache.current_position)
-        
+        queries, keys = self.position_embedding(
+            queries, 
+            keys, 
+            cache.last_position if use_cache else 0,
+            cache.current_position if use_cache else queries.size(-3)
+        )
 
         attn_mask_kwarg = {}
-        if not (use_cache):
+        if use_cache:
             cache.append_keys(self.block_number, keys)
             cache.append_values(self.block_number, values)
             attn_mask_kwarg['attn_mask'] = cache.get_mask()
@@ -206,10 +214,11 @@ class attention(torch.nn.Module):
         # transpose to switch the sequence and head dimensions
         attention = torch.nn.functional.scaled_dot_product_attention(
             queries.transpose(-3, -2),
-            keys.transpose(-3, -2) if use_cache else cache.get_full_keys(self.block_number).transpose(-3, -2),
-            values.transpose(-3, -2) if use_cache else cache.get_full_values(self.block_number).transpose(-3, -2),
+            cache.get_full_keys(self.block_number).transpose(-3, -2) if use_cache else keys.transpose(-3, -2),
+            cache.get_full_values(self.block_number).transpose(-3, -2) if use_cache else values.transpose(-3, -2),
             dropout_p = self.dropout_rate if self.training else 0.0,
             is_causal = not use_cache,
+            **attn_mask_kwarg
         ).transpose(-3, -2)
 
 
@@ -242,7 +251,7 @@ class transformer_block(torch.nn.Module):
         self.attention = attention(config.attention_config, config, network_config)
 
     
-    def forward(self, activations: torch.Tensor, cache: Optional[transformer_cache]) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
+    def forward(self, activations: torch.Tensor, cache: Optional[transformer_cache] = None) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
         activations = activations + self.attention(self.first_ln(activations), cache)
         activations = activations + self.mlp(self.second_ln(activations))
 
@@ -274,8 +283,8 @@ class transformer_network(torch.nn.Module):
         self.transformer_head = torch.nn.Linear(config.embedding_size, config.vocab_size, bias = False)
         self.transformer_head.weight = self.wte.weight
 
-
-    def forward(self, encodings: torch.Tensor, cache: Optional[transformer_cache]) -> torch.Tensor:
+    # cache is modified in place
+    def forward(self, encodings: torch.Tensor, cache: Optional[transformer_cache] = None) -> torch.Tensor:
         embeddings = torch.nn.functional.dropout(self.wte(encodings), p = self.config.dropout_rate, training = self.training)
         if cache is not None:
             cache.increment_position(embeddings.size(dim = -2))
