@@ -91,11 +91,23 @@ class transformer_cache(torch.nn.Module):
             self.device_kwarg["device"] = device
 
         self.keys = [(
-            torch.empty(*proceeding_dimensions, max_sequence_length, block_config.attention_config.n_attn_heads, block.attention.key_head_size, **self.device_kwarg),
+            torch.empty(
+                *proceeding_dimensions,
+                max_sequence_length,
+                block_config.attention_config.n_attn_heads,
+                block_config.attention_config.key_size // block_config.attention_config.n_attn_heads,
+                **self.device_kwarg
+            ),
         ) for block_config in network_config.block_configs]
 
         self.values = [(
-            torch.empty(*proceeding_dimensions, max_sequence_length, block_config.n_attn_heads, block.attention.value_head_size, **self.device_kwarg)
+            torch.empty(
+                *proceeding_dimensions,
+                max_sequence_length,
+                block_config.n_attn_heads,
+                block_config.value_size // block_config.n_attn_heads,
+                **self.device_kwarg
+            )
         ) for block_config in network_config.block_configs]
 
     def increment_position(self, amount: int):
