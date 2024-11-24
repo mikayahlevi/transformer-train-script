@@ -66,6 +66,71 @@ class xpos(torch.nn.Module):
 
 
         return queries, keys
+    
+
+
+
+class transformer_cache(torch.nn.Module):
+    def __init__(self, config: transformer_config, proceeding_dimensions: tuple[int, ...], device: Optional[str] = None):
+        super(transformer_cache, self).__init__()
+
+        self.config = config
+
+
+        self.last_position = 0
+        self.current_position = 0
+
+
+        device_kwarg = {} if device is None else {'device': device}
+
+        self.keys = torch.empty(proceeding_dimensions + (config.n_blocks, config.max_sequence_length, config.n_attn_heads, config.key_size), **device_kwarg)
+        self.values = torch.empty(proceeding_dimensions + (config.n_blocks, config.max_sequence_length, config.n_attn_heads, config.value_size), **device_kwarg)
+
+    def increment_position(self, amount: int):
+        self.last_position = self.current_position
+        self.current_position += amount
+
+    def reset(self):
+        self.last_position = 0
+        self.current_position = 0
+
+    def append_keys(self, keys: torch.Tensor, block_number: int):
+        self.keys[..., block_number, self.last_position:self.current_position, :, :] = keys
+
+    def append_values(self, values: torch.Tensor, block_number: int):
+        self.values[..., block_number, self.last_position:self.current_position, :, :] = values
+
+    def get_full_keys(self, block_number: int) -> torch.Tensor:
+        return self.keys[..., block_number, :self.current_position, :, :]
+    
+    def get_full_values(self, block_number: int) -> torch.Tensor:
+        return self.values[..., block_number, :self.current_position, :, :]
+
+    def get_previous_keys(self, block_number: int) -> torch.Tensor:
+        return self.keys[..., block_number, :self.last_position, :, :]
+
+    def get_previous_values(self, block_number: int) -> torch.Tensor:
+        return self.values[..., block_number, :self.last_position, :, :]
+    
+
+    def get_mask(self) -> torch.Tensor:
+        return torch.ones(
+            (self.current_position - self.last_position + 1, self.current_position + 1), dtype=torch.bool, **self.device_kwarg
+        ).tril(self.last_position)
+        
+
+
+class transformer_attention(torch.nn.Module):
+    def __init__(self, key_size: int, value_size: int, max_sequence_length: int):
+        super(transformer_attention, self).__init__()
+
+        self.key_size = key_size
+        self.value_size = value_size
+
+        self.position_embedding = xpos(key_size, max_sequence_length = max_sequence_length)
+    
+
+
 
 
 class transformer_block(torch.nn.Module):
@@ -74,6 +139,8 @@ class transformer_block(torch.nn.Module):
 
         self.config = config
 
+
+        self.block_number = block_number
 
 
         if config.key_size % config.n_attn_heads != 0:
