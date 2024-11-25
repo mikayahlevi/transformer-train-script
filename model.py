@@ -71,7 +71,7 @@ class xpos(torch.nn.Module):
 
 
 class transformer_cache(torch.nn.Module):
-    def __init__(self, config: transformer_config, proceeding_dimensions: tuple[int, ...], device: Optional[str] = None):
+    def __init__(self, config: transformer_config, proceeding_dimensions: tuple[int, ...] = (1,), device: Optional[str] = None):
         super(transformer_cache, self).__init__()
 
         self.config = config
@@ -81,18 +81,18 @@ class transformer_cache(torch.nn.Module):
         self.current_position = 0
 
 
-        device_kwarg = {} if device is None else {'device': device}
+        self.device_kwarg = {} if device is None else {'device': device}
 
-        self.keys = torch.empty(proceeding_dimensions + (config.n_blocks, config.max_sequence_length, config.n_attn_heads, config.key_size), **device_kwarg)
-        self.values = torch.empty(proceeding_dimensions + (config.n_blocks, config.max_sequence_length, config.n_attn_heads, config.value_size), **device_kwarg)
+        self.keys = torch.empty(proceeding_dimensions + (config.n_blocks, config.max_sequence_length, config.n_attn_heads, config.key_size // config.n_attn_heads), **self.device_kwarg)
+        self.values = torch.empty(proceeding_dimensions + (config.n_blocks, config.max_sequence_length, config.n_attn_heads, config.value_size // config.n_attn_heads), **self.device_kwarg)
 
     def increment_position(self, amount: int):
         self.last_position = self.current_position
         self.current_position += amount
 
     def reset(self):
-        self.last_position = 0
-        self.current_position = 0
+        self.last_position = 1
+        self.current_position = 1
 
     def append_keys(self, keys: torch.Tensor, block_number: int):
         self.keys[..., block_number, self.last_position:self.current_position, :, :] = keys
@@ -115,15 +115,19 @@ class transformer_cache(torch.nn.Module):
 
     def get_mask(self) -> torch.Tensor:
         return torch.ones(
-            (self.current_position - self.last_position + 1, self.current_position + 1), dtype=torch.bool, **self.device_kwarg
+            (self.current_position - self.last_position, self.current_position), dtype=torch.bool, **self.device_kwarg
         ).tril(self.last_position)
         
 
 
 class transformer_attention(torch.nn.Module):
-    def __init__(self, config, max_sequence_length: int = 1024):
+    def __init__(self, config, block_number: int):
         super(transformer_attention, self).__init__()
 
+
+        self.block_number = block_number
+
+        self.config = config
 
         if config.key_size % config.n_attn_heads != 0:
             raise ValueError("key size must be divisible by the number of attention heads")
@@ -146,9 +150,9 @@ class transformer_attention(torch.nn.Module):
         torch.nn.init.normal_(self.attention_down.weight, mean = 0, std = 0.02 / math.sqrt(config.n_blocks))
 
 
-        self.position_embedding = xpos(self.key_head_size, max_sequence_length = max_sequence_length)
+        self.position_embedding = xpos(self.key_head_size, max_sequence_length = config.max_sequence_length)
 
-    def forward(self, activations: torch.Tensor, cache: Optional[transformer_cache]) -> torch.Tensor:
+    def forward(self, activations: torch.Tensor, cache: Optional[transformer_cache] = None) -> torch.Tensor:
         use_cache = cache is not None
 
         queries = self.query_layer(activations).unflatten(-1, (self.config.n_attn_heads, self.key_head_size))
@@ -157,20 +161,25 @@ class transformer_attention(torch.nn.Module):
         values = self.value_layer(activations).unflatten(-1, (self.config.n_attn_heads, self.value_head_size))
 
 
-        queries, incoming_keys = self.position_embedding(queries, incoming_keys, cache.last_position, cache.current_position)
+        queries, keys = self.position_embedding(
+            queries,
+            keys,
+            cache.last_position if use_cache else 0,
+            cache.current_position if use_cache else activations.size(-2)
+        )
 
 
         mask_kwarg = {}
         if use_cache:
-            mask_kwarg['mask'] = cache.get_mask()
+            mask_kwarg['attn_mask'] = cache.get_mask()
             cache.append_keys(keys, self.block_number)
             cache.append_values(values, self.block_number)
 
         # transpose to switch the sequence and head dimensions
         attention = torch.nn.functional.scaled_dot_product_attention(
             queries.transpose(-3, -2),
-            cache.get_full_keys(self.block_number) if use_cache else keys.transpose(-3, -2),
-            cache.get_full_values(self.block_number) if use_cache else values.transpose(-3, -2),
+            (cache.get_full_keys(self.block_number) if use_cache else keys).transpose(-3, -2),
+            (cache.get_full_values(self.block_number) if use_cache else values).transpose(-3, -2),
             is_causal = not use_cache,
             dropout_p = self.config.dropout_rate if self.training else 0.0,
             **mask_kwarg
@@ -196,9 +205,6 @@ class transformer_block(torch.nn.Module):
         self.config = config
 
 
-        self.block_number = block_number
-
-
         self.first_ln = torch.nn.LayerNorm(config.embedding_size, bias = False)
         self.second_ln = torch.nn.LayerNorm(config.embedding_size, bias = False)
 
@@ -211,10 +217,10 @@ class transformer_block(torch.nn.Module):
         torch.nn.init.normal_(self.mlp[0].weight, mean = 0, std = 0.02)
         torch.nn.init.normal_(self.mlp[2].weight, mean = 0, std = 0.02 / math.sqrt(config.n_blocks))
 
-        self.attention = transformer_attention(config)
+        self.attention = transformer_attention(config, block_number)
 
     
-    def forward(self, activations: torch.Tensor, cache: Optional[transformer_cache]) = None -> torch.Tensor:
+    def forward(self, activations: torch.Tensor, cache: Optional[transformer_cache] = None) -> torch.Tensor:
         activations = activations + self.attention(self.first_ln(activations), cache)
         activations = activations + self.mlp(self.second_ln(activations))
         return activations
@@ -249,7 +255,8 @@ class transformer_network(torch.nn.Module):
             training = self.training
         )
 
-        cache.increment_position(embeddings.size(-2))
+        if cache is not None:
+            cache.increment_position(embeddings.size(-2))
 
         for block in self.blocks:
             embeddings = block(embeddings, cache)
