@@ -211,7 +211,8 @@ class transformer_block(torch.nn.Module):
         self.mlp = torch.nn.Sequential(
             torch.nn.Linear(config.embedding_size, config.embedding_size * 4, bias = False),
             torch.nn.GELU(),
-            torch.nn.Linear(config.embedding_size * 4, config.embedding_size, bias = False)
+            torch.nn.Linear(config.embedding_size * 4, config.embedding_size, bias = False),
+            torch.nn.Dropout(config.dropout_rate)
         )
 
         torch.nn.init.normal_(self.mlp[0].weight, mean = 0, std = 0.02)
