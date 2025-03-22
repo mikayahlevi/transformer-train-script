@@ -64,12 +64,6 @@ def get_dataset_and_tokenizer(sequence_length: int):
     for split in dataset.keys():
         dataset[split] = dataset[split].batch(sequence_length, drop_last_batch = True)
 
-    # save formatted dataset to the disk
-    dataset.save_to_disk('data/shakespeare_char/dataset')
-
-    # save tokenizer to the disk
-    pickle.dump(tokenizer, open('data/shakespeare_char/tokenizer', 'wb'))
-
     return dataset.with_format(type = 'torch', columns = ['ids']), tokenizer
         
 

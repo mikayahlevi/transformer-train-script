@@ -3,7 +3,7 @@ import numpy as np
 
 import time
 import colorama
-import json
+import os
 
 
 from dataclasses import dataclass
@@ -96,18 +96,18 @@ def configure_optimizer(model, hyperparameters):
 
 
 def format_info(info):
-    str = ''
+    tmp = ''
     for i, (key, value) in enumerate(info.items()):
         if i == 0:
-            str += value + ' ' + key
+            tmp += str(value).rjust(6) + ' ' + key
         else:
-            str += (value + ' ' + key).rjust(len(key) + 12)
+            tmp += '      ' + str(value).rjust(6) + ' ' + key
         
-    return str
+    return tmp
 
 
 
-def train(settings, hyperparameters, model, dataset, tokenizer, device):
+def train(settings, hyperparameters, model, dataset, device):
     print(colorama.Fore.GREEN)
     print('starting training')
     print(colorama.Style.RESET_ALL, end='')
@@ -121,9 +121,8 @@ def train(settings, hyperparameters, model, dataset, tokenizer, device):
 
 
     criterion = torch.nn.CrossEntropyLoss(reduction = 'mean')
-    if tokenizer.padding:
-        criterion.ignore_index = tokenizer.token_to_id('<pad>')
-    
+    if hasattr(dataset, 'ignore_index'):
+        criterion.ignore_index = dataset.ignore_index
 
     
     optimizer = configure_optimizer(model, hyperparameters)
@@ -138,9 +137,9 @@ def train(settings, hyperparameters, model, dataset, tokenizer, device):
 
     log_train_loss_sum = 0.0
     print_train_loss_sum = 0.0
-    print_val_loss_sum = 0.0
-    n_evals_since_print = 0
-    
+    last_val_loss = 'n/a'
+
+
     start = time.time()
     for step in range(settings.total_steps):
         model.train()
@@ -161,7 +160,6 @@ def train(settings, hyperparameters, model, dataset, tokenizer, device):
 
         loss.backward()
 
-        # clip grad norm
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 
         if (step + 1) % settings.update_every == 0:
@@ -169,44 +167,45 @@ def train(settings, hyperparameters, model, dataset, tokenizer, device):
             optimizer.zero_grad()
 
 
-
         if (step + 1) % settings.schedule_every == 0:
             scheduler.step()
 
-            log_msg = f'step: {step + 1}' + 'lr: ' + '{:.4f}'.format(scheduler.get_last_lr()[0])
+            log_msg = f'step: {step + 1}' + '  ' + 'lr: ' + '{:.6f}'.format(scheduler.get_last_lr()[0])
             with open(settings.train_log_path + '/stats/log.txt', 'a') as file: 
                 file.write(log_msg + '\n')
         
 
         if (step + 1) % settings.log_loss_every == 0:
-            log_train_loss_sum = 0.0
             train_loss_average = log_train_loss_sum / settings.log_loss_every
+            log_train_loss_sum = 0.0
 
-            log_msg = f'step: {step + 1}' + 'lr: ' + str(train_loss_average)
+            log_msg = f'step: {step + 1}' + '  ' + 'train loss: ' + '{:.6f}'.format(train_loss_average)
             with open(settings.train_log_path + '/stats/log.txt', 'a') as file: 
                 file.write(log_msg + '\n')
 
 
-        if (step + 1) % settings.log_eval_every == 0:
+        if (step + 1) % settings.eval_every == 0:
             val_loss_sum = 0.0
 
+            model.eval()
             with torch.inference_mode():
-                for _, val_ids in iter(val_dataloader):
-                    val_ids = val_ids.to(device)
+                for val_item in iter(val_dataloader):
+                    val_ids = val_item['ids'].to(device)
                     val_inputs, val_labels = val_ids[:-1], val_ids[1:]
 
                     val_logits = model(val_inputs)
 
-                    val_loss = criterion(logits.flatten(-3, -2), labels.flatten(-2, -1))
+                    val_loss = criterion(val_logits.flatten(-3, -2), val_labels.flatten(-2, -1))
 
-                    val_loss_sum += val_loss
+                    val_loss_sum += val_loss.item()
+
+            model.train()
             
             val_loss_avg = val_loss_sum / len(val_dataloader)
             
-            print_val_loss_sum += val_loss_avg
-            n_evals_since_print += 1
+            last_val_loss = val_loss_avg
 
-            log_msg = f'step: {step + 1}' + 'lr: ' + str(val_loss_avg)
+            log_msg = f'step: {step + 1}' + '  ' + 'val loss: ' + '{:.6f}'.format(val_loss_avg)
             with open(settings.train_log_path + '/stats/log.txt', 'a') as file: 
                 file.write(log_msg + '\n')
 
@@ -220,13 +219,12 @@ def train(settings, hyperparameters, model, dataset, tokenizer, device):
             }
 
 
-            print_info['train loss'] = print_train_loss_sum / settings.print_progress_every
+            print_info['avg train loss'] = '{:.4f}'.format(print_train_loss_sum / settings.print_progress_every)
             print_train_loss_sum = 0
 
-            print_info['val loss'] = print_val_loss_sum / n_evals_since_print
-            print_val_loss_sum = 0
+            print_info['last val loss'] = '{:.4f}'.format(last_val_loss) if last_val_loss != 'n/a' else 'n/a'
 
-            print_info['lr'] = '{:.4f}'.format(scheduler.get_last_lr()[0])
+            print_info['current lr'] = '{:.6f}'.format(scheduler.get_last_lr()[0])
 
             # print the info
             print(colorama.Fore.YELLOW, end='')
@@ -236,51 +234,4 @@ def train(settings, hyperparameters, model, dataset, tokenizer, device):
         
 
         if (step + 1) % settings.save_checkpoint_every == 0:
-            torch.save(model.state_dict(), settings.train_run_path + '/models/' + 'checkpoint-'  + 'step-' + str(step + 1) + '.pt')
-
-        
-            model.eval()
-
-            # log information
-            if settings.log_minor and (step + 1) % settings.log_minor_every == 0:
-                # compute the average loss
-                avg_train_loss = log_minor_loss_total / settings.log_minor_every
-                log_minor_loss_total = 0.0
-                
-
-                # set the info to be displayed
-                info = {
-                    'time elapsed': time.strftime('%M:%S', time.gmtime(time.time() - start)),
-                    'steps': str(step + 1),
-                    'done': '{:.2f}'.format(100 * (step + 1) / settings.total_steps) + '%',
-                    'avg train loss': '{:.4f}'.format(avg_train_loss),
-                    'lr': '{:.4f}'.format(scheduler.get_last_lr()[0])
-                }
-
-
-                # print the info
-                print(colorama.Fore.CYAN, end='')
-                print(format_info(info))
-                print(colorama.Style.RESET_ALL, end='')
-
-
-
-            if settings.log_major and (step + 1) % settings.log_major_every == 0:
-                # compute the average loss
-                avg_train_loss = log_major_loss_total / settings.log_major_every
-                log_major_loss_total = 0.0
-
-
-                # evaluate the model on the validation set
-                val_loss_total = 0.0
-                for val_step in range(len(val_dataloader)):
-                    inputs, labels = next(iter(val_dataloader)).values()
-                
-                    inputs, labels = inputs.to(device), labels.to(device)
-
-                    logits = model(inputs)
-
-                    loss = criterion(logits.flatten(-3, -2), labels.flatten(-2, -1))
-
-                    val_loss_total += loss.item()
-                avg_val_loss = val_loss_total / len(val_dataloader)
+            torch.save(model.state_dict(), os.path.join(settings.train_log_path, 'models', 'checkpoint-'  + 'step-' + str(step + 1) + '.pt'))
