@@ -146,7 +146,7 @@ def train(settings, hyperparameters, model, dataset, device):
 
         ids = next(iter(train_dataloader))['ids'].to(device)
         
-        inputs, labels = ids[:-1], ids[1:]
+        inputs, labels = ids[..., :-1], ids[..., 1:]
 
         logits = model(inputs)
 

@@ -47,22 +47,19 @@ def get_dataset_and_tokenizer(sequence_length: int):
     train_to_val_ratio = 0.9
     train_len = int(len(ids) * train_to_val_ratio)
 
-    train_ids = ids[:train_len]
-    val_ids = ids[train_len:]
-
 
     dataset = datasets.DatasetDict({
         'train': datasets.Dataset.from_dict({
-            'ids': train_ids
+            'ids': ids[:train_len]
         }),
         'validation': datasets.Dataset.from_dict({
-            'ids': val_ids
+            'ids': ids[train_len:]
         })
     })
 
     # batch the dataset
     for split in dataset.keys():
-        dataset[split] = dataset[split].batch(sequence_length, drop_last_batch = True)
+        dataset[split] = dataset[split].batch(sequence_length + 1, drop_last_batch = True)
 
     return dataset.with_format(type = 'torch', columns = ['ids']), tokenizer
         
