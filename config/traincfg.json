@@ -1,22 +1,21 @@
 {
-    "sequence_length": 256,
-    "batch_size": 64,
+    "sequence_length": 1024,
+    "batch_size": 48,
+
+    "total_steps": 50000,
 
 
-    "total_steps": 5000,
+    "update_every": 4,
 
+    "schedule_every": 16,
 
-    "update_every": 1,
+    "log_loss_every": 32,
 
-    "schedule_every": 10,
-
-    "log_loss_every": 20,
-
-    "eval_every": 200,
+    "eval_every": 256,
 
 
     "print_progress_every": 40,
 
     
-    "save_checkpoint_every": 1000000
+    "save_checkpoint_every": 1000
 }
