@@ -51,7 +51,7 @@ if __name__ == '__main__':
 
     with open(os.path.join(args.config_path, 'modelcfg.json'), 'r') as f:
         # set the model's vocab size to the dataset's vocab size
-        modelcfg = transformer_config(**json.load(f), vocab_size = tokenizer.get_vocab_size())
+        modelcfg = transformer_config(**json.load(f), vocab_size = tokenizer.get_vocab)
 
 
     # create the path to log the info and dump the configs as jsons
