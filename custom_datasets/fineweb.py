@@ -1,7 +1,5 @@
 import transformers
 import datasets
-import tokenizers
-
 
 
 def get_dataset_and_tokenizer(sequence_length: int):
@@ -11,7 +9,7 @@ def get_dataset_and_tokenizer(sequence_length: int):
     # take only 2B tokens of the dataset
     dataset = dataset.shard(num_shards=5, index=0)
 
-    tokenizer = transformers.AutoModel.from_pretrained("HuggingFaceTB/cosmo2-tokenizer")
+    tokenizer = transformers.GPT2TokenizerFast.from_pretrained("gpt2")
 
     def tokenize_function(examples):
         return tokenizer(
