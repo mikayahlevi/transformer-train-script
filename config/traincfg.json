@@ -6,17 +6,17 @@
     "total_steps": 5000,
 
 
-    "update_every": 1,
+    "update_interval": 1,
 
-    "schedule_every": 10,
+    "schedule_interval": 10,
 
-    "log_loss_every": 20,
+    "log_loss_interval": 20,
 
-    "eval_every": 200,
+    "eval_interval": 200,
 
 
-    "print_progress_every": 40,
+    "print_progress_interval": 40,
 
     
-    "save_checkpoint_every": 1000000
+    "save_checkpoint_interval": 1000
 }

@@ -22,19 +22,19 @@ class train_config:
     total_steps: int = 5000
 
 
-    update_every: int = 1
+    update_interval: int = 1
 
-    schedule_every: int = 20
+    schedule_interval: int = 20
 
-    log_loss_every: int = 20
+    log_loss_interval: int = 20
     # eval on the validation dataset
-    eval_every: int = 200
+    eval_interval: int = 200
 
 
-    print_progress_every: int = 40
+    print_progress_interval: int = 40
 
     
-    save_checkpoint_every: int = 1000
+    save_checkpoint_interval: int = 1000
 
     train_log_path: Optional[str] = None
     
@@ -128,8 +128,8 @@ def train(settings, hyperparameters, model, dataset, device):
     optimizer = configure_optimizer(model, hyperparameters)
     scheduler = torch.optim.lr_scheduler.ChainedScheduler(
         [
-            torch.optim.lr_scheduler.LinearLR(optimizer, start_factor = hyperparameters.start_lr / hyperparameters.peak_lr, end_factor = 1.0, total_iters = hyperparameters.lr_warmup_steps // settings.schedule_every),
-            torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = hyperparameters.lr_decay_steps // settings.schedule_every, eta_min = hyperparameters.end_lr)
+            torch.optim.lr_scheduler.LinearLR(optimizer, start_factor = hyperparameters.start_lr / hyperparameters.peak_lr, end_factor = 1.0, total_iters = hyperparameters.lr_warmup_steps // settings.schedule_interval),
+            torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = hyperparameters.lr_decay_steps // settings.schedule_interval, eta_min = hyperparameters.end_lr)
         ]
     )
 
@@ -162,12 +162,12 @@ def train(settings, hyperparameters, model, dataset, device):
 
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 
-        if (step + 1) % settings.update_every == 0:
+        if (step + 1) % settings.update_interval == 0:
             optimizer.step()
             optimizer.zero_grad()
 
 
-        if (step + 1) % settings.schedule_every == 0:
+        if (step + 1) % settings.schedule_interval == 0:
             scheduler.step()
 
             log_msg = f'step: {step + 1}' + '  ' + 'lr: ' + '{:.6f}'.format(scheduler.get_last_lr()[0])
@@ -175,8 +175,8 @@ def train(settings, hyperparameters, model, dataset, device):
                 file.write(log_msg + '\n')
         
 
-        if (step + 1) % settings.log_loss_every == 0:
-            train_loss_average = log_train_loss_sum / settings.log_loss_every
+        if (step + 1) % settings.log_loss_interval == 0:
+            train_loss_average = log_train_loss_sum / settings.log_loss_interval
             log_train_loss_sum = 0.0
 
             log_msg = f'step: {step + 1}' + '  ' + 'train loss: ' + '{:.6f}'.format(train_loss_average)
@@ -184,7 +184,7 @@ def train(settings, hyperparameters, model, dataset, device):
                 file.write(log_msg + '\n')
 
 
-        if (step + 1) % settings.eval_every == 0:
+        if (step + 1) % settings.eval_interval == 0:
             val_loss_sum = 0.0
 
             model.eval()
@@ -210,7 +210,7 @@ def train(settings, hyperparameters, model, dataset, device):
                 file.write(log_msg + '\n')
 
         
-        if (step + 1) % settings.print_progress_every == 0:
+        if (step + 1) % settings.print_progress_interval == 0:
             print_info = {
                 'time elapsed': time.strftime('%H:%M:%S', time.gmtime(time.time() - start)),
                 'done': '{:.2f}'.format(100 * (step + 1) / settings.total_steps) + '%',
@@ -219,7 +219,7 @@ def train(settings, hyperparameters, model, dataset, device):
             }
 
 
-            print_info['avg train loss'] = '{:.4f}'.format(print_train_loss_sum / settings.print_progress_every)
+            print_info['avg train loss'] = '{:.4f}'.format(print_train_loss_sum / settings.print_progress_interval)
             print_train_loss_sum = 0
 
             print_info['last val loss'] = '{:.4f}'.format(last_val_loss) if last_val_loss != 'n/a' else 'n/a'
@@ -233,5 +233,5 @@ def train(settings, hyperparameters, model, dataset, device):
         
         
 
-        if (step + 1) % settings.save_checkpoint_every == 0:
+        if (step + 1) % settings.save_checkpoint_interval == 0:
             torch.save(model.state_dict(), os.path.join(settings.train_log_path, 'models', 'checkpoint-'  + 'step-' + str(step + 1) + '.pt'))
