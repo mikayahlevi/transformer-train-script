@@ -10,8 +10,6 @@ from dataclasses import dataclass
 from matplotlib import pyplot
 from typing import Optional
 
-from model import transformer_config
-
 
 @dataclass
 class train_config:
