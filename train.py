@@ -116,7 +116,7 @@ def train(settings, hyperparameters, model, dataset, device):
         import getpass
         
         print(colorama.Fore.BLUE)
-        print('logging to wandb')
+        print('wandb logging enabled')
         print(colorama.Style.RESET_ALL, end='')
 
         
@@ -140,7 +140,7 @@ def train(settings, hyperparameters, model, dataset, device):
         # for wandb logging, the step is 0-indexed, while for file logging, it is 1-indexed
 
         if settings.log_to_wandb:
-            wandb.log({metric: value}, step = step)
+            wandb.log({metric: value}, step = step + 1)
 
         if settings.log_to_file:
             with open(os.path.join(settings.train_folder_path, 'stats/log.txt'), 'a') as file: 
