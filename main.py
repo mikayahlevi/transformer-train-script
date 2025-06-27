@@ -21,8 +21,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--device', type = str, default = 'cuda')
 parser.add_argument('--dataset', type = str)
 parser.add_argument('--compile', type = bool, default = False)
-parser.add_argument('--config_path', type = str, default = 'config')
-parser.add_argument('--train_log_path', type = str, default ='trains')
+parser.add_argument('--config_folder_path', type = str, default = 'config')
+parser.add_argument('--train_log_dir', type = str, default = 'trains')
 
 
 args = parser.parse_args()
@@ -39,9 +39,9 @@ if __name__ == '__main__':
 
     # load the configs from the json files
     traincfg, modelcfg, hparams = None, None, None
-    with open(os.path.join(args.config_path, 'traincfg.json'), 'r') as f:
+    with open(os.path.join(args.config_folder_path, 'traincfg.json'), 'r') as f:
         traincfg = train_config(**json.load(f))
-    with open(os.path.join(args.config_path, 'hparams.json'), 'r') as f:
+    with open(os.path.join(args.config_folder_path, 'hparams.json'), 'r') as f:
         hparams = hyperparameter_config(**json.load(f))
 
 
@@ -49,7 +49,7 @@ if __name__ == '__main__':
     dataset, tokenizer = dataset_module.get_dataset_and_tokenizer(traincfg.sequence_length)
 
 
-    with open(os.path.join(args.config_path, 'modelcfg.json'), 'r') as f:
+    with open(os.path.join(args.config_folder_path, 'modelcfg.json'), 'r') as f:
         # set the model's vocab size to the dataset's vocab size
         modelcfg = transformer_config(**json.load(f), vocab_size = tokenizer.get_vocab_size())
 
