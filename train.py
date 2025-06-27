@@ -24,19 +24,20 @@ class train_config:
 
     schedule_interval: int = 20
 
-    log_loss_interval: int = 20
-    # eval on the validation dataset
-    eval_interval: int = 200
+    train_loss_log_interval: int = 20
+    # run the model on the validation dataset and get the loss
+    val_loss_log_interval: int = 200
 
+    # display the logged metrics with the console
+    display_metrics_interval: int = 40
+    display_metrics: bool = True
 
-    print_progress_interval: int = 40
+    log_to_file: bool = True
 
-
-    save_checkpoint_interval: int = 1000
-
-
-    train_folder_path: Optional[str] = None
+    log_to_wandb: bool = False
     
+
+    save_checkpoint_interval: int = 1000    
     
 
 
@@ -234,3 +235,7 @@ def train(settings, hyperparameters, model, dataset, device):
 
         if (step + 1) % settings.save_checkpoint_interval == 0:
             torch.save(model.state_dict(), os.path.join(settings.train_folder_path, 'models', 'checkpoint-' + 'step-' + str(step + 1) + '.pt'))
+
+    print(colorama.Fore.GREEN)
+    print('training finished:', settings.total_steps, 'steps completed')
+    print(colorama.Style.RESET_ALL, end='')

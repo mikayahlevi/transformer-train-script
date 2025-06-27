@@ -46,9 +46,7 @@ if __name__ == '__main__':
         hparams = hyperparameter_config(**json.load(f))
 
 
-
     dataset, tokenizer = dataset_module.get_dataset_and_tokenizer(traincfg.sequence_length)
-
 
     with open(os.path.join(args.config_folder_path, 'modelcfg.json'), 'r') as f:
         # set the model's vocab size to the dataset's vocab size
@@ -80,7 +78,6 @@ if __name__ == '__main__':
         if os.path.exists(train_folder_path):
             raise ValueError(f'Specified train folder {train_folder_path} already exists.')
 
-
     os.makedirs(train_folder_path)
 
     os.makedirs(os.path.join(train_folder_path, 'models'))
@@ -92,6 +89,9 @@ if __name__ == '__main__':
         f.write(json.dumps(dataclasses.asdict(hparams)))
     with open(os.path.join(train_folder_path, 'modelcfg.json'), 'w') as f:
         f.write(json.dumps(dataclasses.asdict(modelcfg)))
+    
+    
+    traincfg.train_folder_path = train_folder_path
 
 
 
