@@ -120,12 +120,12 @@ def train(settings, hyperparameters, model, dataset, device):
         print(colorama.Style.RESET_ALL, end='')
 
         
-        wandb.login(key = (getpass.getpass('Enter your wandb API key: ') if os.environ.get('WANDB_API_KEY') is None else None))
+        wandb.login(key = (getpass.getpass('enter your wandb API key: ') if os.environ.get('WANDB_API_KEY') is None else None))
 
 
         optional_wandb_cm = wandb.init(
-            project = input('Enter the wandb project name: '),
-            name = input('Enter the wandb run name: '),
+            project = input('enter the wandb project name: '),
+            name = input('enter the wandb run name: '),
             config = {
                 **dataclasses.asdict(settings),
                 **dataclasses.asdict(hyperparameters),
@@ -143,7 +143,7 @@ def train(settings, hyperparameters, model, dataset, device):
             wandb.log({metric: value}, step = step)
 
         if settings.log_to_file:
-            with open(os.path.join(settings.train_folder_path, '/stats/log.txt'), 'a') as file: 
+            with open(os.path.join(settings.train_folder_path, 'stats/log.txt'), 'a') as file: 
                 file.write(f'step: {step + 1}  {metric}: {value:.6f}\n')
 
 
@@ -220,7 +220,7 @@ def train(settings, hyperparameters, model, dataset, device):
                 log_metric(step, 'train_loss', train_loss_average)
 
 
-            if (step + 1) % settings.eval_interval == 0:
+            if (step + 1) % settings.val_loss_log_interval == 0:
                 val_loss_sum = 0.0
 
                 model.eval()
