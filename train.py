@@ -31,10 +31,11 @@ class train_config:
 
     print_progress_interval: int = 40
 
-    
+
     save_checkpoint_interval: int = 1000
 
-    train_log_path: Optional[str] = None
+
+    train_folder_path: Optional[str] = None
     
     
 
@@ -169,7 +170,7 @@ def train(settings, hyperparameters, model, dataset, device):
             scheduler.step()
 
             log_msg = f'step: {step + 1}' + '  ' + 'lr: ' + '{:.6f}'.format(scheduler.get_last_lr()[0])
-            with open(settings.train_log_path + '/stats/log.txt', 'a') as file: 
+            with open(os.path.join(settings.train_folder_path, '/stats/log.txt'), 'a') as file: 
                 file.write(log_msg + '\n')
         
 
@@ -178,7 +179,7 @@ def train(settings, hyperparameters, model, dataset, device):
             log_train_loss_sum = 0.0
 
             log_msg = f'step: {step + 1}' + '  ' + 'train loss: ' + '{:.6f}'.format(train_loss_average)
-            with open(settings.train_log_path + '/stats/log.txt', 'a') as file: 
+            with open(os.path.join(settings.train_folder_path, '/stats/log.txt'), 'a') as file: 
                 file.write(log_msg + '\n')
 
 
@@ -204,7 +205,7 @@ def train(settings, hyperparameters, model, dataset, device):
             last_val_loss = val_loss_avg
 
             log_msg = f'step: {step + 1}' + '  ' + 'val loss: ' + '{:.6f}'.format(val_loss_avg)
-            with open(settings.train_log_path + '/stats/log.txt', 'a') as file: 
+            with open(os.path.join(settings.train_folder_path, '/stats/log.txt'), 'a') as file: 
                 file.write(log_msg + '\n')
 
         
@@ -232,4 +233,4 @@ def train(settings, hyperparameters, model, dataset, device):
         
 
         if (step + 1) % settings.save_checkpoint_interval == 0:
-            torch.save(model.state_dict(), os.path.join(settings.train_log_path, 'models', 'checkpoint-'  + 'step-' + str(step + 1) + '.pt'))
+            torch.save(model.state_dict(), os.path.join(settings.train_folder_path, 'models', 'checkpoint-' + 'step-' + str(step + 1) + '.pt'))
