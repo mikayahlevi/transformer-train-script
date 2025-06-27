@@ -147,7 +147,7 @@ class transformer_attention(torch.nn.Module):
         torch.nn.init.normal_(self.value_layer.weight, mean = 0, std = 0.02)
 
         self.attention_down = torch.nn.Linear(config.value_size, config.embedding_size, bias = False)
-        torch.nn.init.normal_(self.attention_down.weight, mean = 0, std = 0.02 / math.sqrt(config.n_blocks))
+        torch.nn.init.normal_(self.attention_down.weight, mean = 0, std = 0.02 / math.sqrt(2 * config.n_blocks))
 
 
         self.position_embedding = xpos(self.key_head_size, max_sequence_length = config.max_sequence_length)
@@ -216,7 +216,7 @@ class transformer_block(torch.nn.Module):
         )
 
         torch.nn.init.normal_(self.mlp[0].weight, mean = 0, std = 0.02)
-        torch.nn.init.normal_(self.mlp[2].weight, mean = 0, std = 0.02 / math.sqrt(config.n_blocks))
+        torch.nn.init.normal_(self.mlp[2].weight, mean = 0, std = 0.02 / math.sqrt(2 * config.n_blocks))
 
         self.attention = transformer_attention(config, block_number)
 
