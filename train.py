@@ -175,9 +175,9 @@ def train(settings, hyperparameters, model, dataset, device):
 
 
 
-        log_train_loss_sum = 0.0
-        print_train_loss_sum = 0.0
-        last_val_loss = 'n/a'
+        logged_train_loss_sum = 0.0
+        displayed_train_loss_sum = 0.0
+        displayed_last_val_loss = 'n/a'
 
 
         start = time.time()
@@ -194,8 +194,8 @@ def train(settings, hyperparameters, model, dataset, device):
             loss = criterion(logits.flatten(-3, -2), labels.flatten(-2, -1))
 
 
-            log_train_loss_sum += loss.item()
-            print_train_loss_sum += loss.item()
+            logged_train_loss_sum += loss.item()
+            displayed_train_loss_sum += loss.item()
 
 
             loss.backward()
@@ -213,9 +213,9 @@ def train(settings, hyperparameters, model, dataset, device):
                 log_metric(step, 'lr', scheduler.get_last_lr()[0])
             
 
-            if (step + 1) % settings.log_loss_interval == 0:
-                train_loss_average = log_train_loss_sum / settings.log_loss_interval
-                log_train_loss_sum = 0.0
+            if (step + 1) % settings.train_loss_log_interval == 0:
+                train_loss_average = logged_train_loss_sum / settings.train_loss_log_interval
+                logged_train_loss_sum = 0.0
                 
                 log_metric(step, 'train_loss', train_loss_average)
 
@@ -239,12 +239,12 @@ def train(settings, hyperparameters, model, dataset, device):
                 
                 val_loss_avg = val_loss_sum / len(val_dataloader)
                 
-                last_val_loss = val_loss_avg
+                displayed_last_val_loss = val_loss_avg
 
                 log_metric(step, 'val_loss', val_loss_avg)
 
             
-            if (step + 1) % settings.print_progress_interval == 0:
+            if (step + 1) % settings.display_metrics_interval == 0:
                 print_info = {
                     'time elapsed': time.strftime('%H:%M:%S', time.gmtime(time.time() - start)),
                     'done': '{:.2f}'.format(100 * (step + 1) / settings.total_steps) + '%',
@@ -253,10 +253,10 @@ def train(settings, hyperparameters, model, dataset, device):
                 }
 
 
-                print_info['avg train loss'] = '{:.4f}'.format(print_train_loss_sum / settings.print_progress_interval)
-                print_train_loss_sum = 0
+                print_info['avg train loss'] = '{:.4f}'.format(displayed_train_loss_sum / settings.display_metrics_interval)
+                displayed_train_loss_sum = 0
 
-                print_info['last val loss'] = '{:.4f}'.format(last_val_loss) if last_val_loss != 'n/a' else 'n/a'
+                print_info['last val loss'] = '{:.4f}'.format(displayed_last_val_loss) if displayed_last_val_loss != 'n/a' else 'n/a'
 
                 print_info['current lr'] = '{:.6f}'.format(scheduler.get_last_lr()[0])
 
