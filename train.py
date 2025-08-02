@@ -36,17 +36,17 @@ class train_config:
     log_to_file: bool = True
 
     log_to_wandb: bool = False
-    
 
-    save_checkpoint_interval: int = 1000    
-    
+
+    save_checkpoint_interval: int = 1000
+
 
 
 @dataclass
 class hyperparameter_config:
     lr_warmup_steps: int
     lr_decay_steps: int
-    
+
     start_lr: float
     peak_lr: float
     end_lr: float
@@ -65,7 +65,7 @@ def get_params_with_names(named_parameters, names: list[str]):
                 break
     return filtered_parameters
 
-    
+
 def remove_params_with_names(named_parameters, names: list[str]):
     filtered_parameters = []
     for n, p in named_parameters:
@@ -103,7 +103,7 @@ def format_info(info):
             tmp += str(value).rjust(6) + ' ' + key
         else:
             tmp += '      ' + str(value).rjust(6) + ' ' + key
-        
+
     return tmp
 
 
@@ -114,12 +114,12 @@ def train(settings, hyperparameters, model, dataset, device):
     if settings.log_to_wandb:
         import wandb
         import getpass
-        
+
         print(colorama.Fore.BLUE)
         print('wandb logging enabled')
         print(colorama.Style.RESET_ALL, end='')
 
-        
+
         wandb.login(key = (getpass.getpass('enter your wandb API key: ') if os.environ.get('WANDB_API_KEY') is None else None))
 
 
@@ -164,7 +164,7 @@ def train(settings, hyperparameters, model, dataset, device):
         if hasattr(dataset, 'ignore_index'):
             criterion.ignore_index = dataset.ignore_index
 
-        
+
         optimizer = configure_optimizer(model, hyperparameters)
         scheduler = torch.optim.lr_scheduler.ChainedScheduler(
             [
@@ -185,7 +185,7 @@ def train(settings, hyperparameters, model, dataset, device):
             model.train()
 
             ids = next(iter(train_dataloader))['ids'].to(device)
-            
+
             inputs, labels = ids[..., :-1], ids[..., 1:]
 
             logits = model(inputs)
@@ -209,14 +209,14 @@ def train(settings, hyperparameters, model, dataset, device):
 
             if (step + 1) % settings.schedule_interval == 0:
                 scheduler.step()
-                
+
                 log_metric(step, 'lr', scheduler.get_last_lr()[0])
-            
+
 
             if (step + 1) % settings.train_loss_log_interval == 0:
                 train_loss_average = logged_train_loss_sum / settings.train_loss_log_interval
                 logged_train_loss_sum = 0.0
-                
+
                 log_metric(step, 'train_loss', train_loss_average)
 
 
@@ -236,14 +236,14 @@ def train(settings, hyperparameters, model, dataset, device):
                         val_loss_sum += val_loss.item()
 
                 model.train()
-                
+
                 val_loss_avg = val_loss_sum / len(val_dataloader)
-                
+
                 displayed_last_val_loss = val_loss_avg
 
                 log_metric(step, 'val_loss', val_loss_avg)
 
-            
+
             if (step + 1) % settings.display_metrics_interval == 0:
                 print_info = {
                     'time elapsed': time.strftime('%H:%M:%S', time.gmtime(time.time() - start)),
@@ -264,8 +264,8 @@ def train(settings, hyperparameters, model, dataset, device):
                 print(colorama.Fore.YELLOW, end='')
                 print(format_info(print_info))
                 print(colorama.Style.RESET_ALL, end='')
-            
-            
+
+
 
             if (step + 1) % settings.save_checkpoint_interval == 0:
                 torch.save(model.state_dict(), os.path.join(settings.train_folder_path, 'models', 'checkpoint-' + 'step-' + str(step + 1) + '.pt'))

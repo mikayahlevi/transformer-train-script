@@ -58,18 +58,18 @@ if __name__ == '__main__':
 
     if args.train_folder_name is None:
         train_folder_auto_name_index = 0
-        
+
         for train_folder_auto_name_index in range(1000):
             train_folder_auto_name = 'train-' + str(train_folder_auto_name_index)
-            
+
             current_auto_path = os.path.join(args.train_folder_dir, train_folder_auto_name)
-            
+
             if os.path.exists(current_auto_path):
                 train_folder_auto_name_index += 1
             else:
                 train_folder_path = current_auto_path
                 break
-        
+
         if train_folder_path is None:
             raise ValueError(f'Could not find a free train folder name in {args.train_folder_dir} after a maximum of 1000 tries.')
 
@@ -89,8 +89,8 @@ if __name__ == '__main__':
         f.write(json.dumps(dataclasses.asdict(hparams)))
     with open(os.path.join(train_folder_path, 'modelcfg.json'), 'w') as f:
         f.write(json.dumps(dataclasses.asdict(modelcfg)))
-    
-    
+
+
     traincfg.train_folder_path = train_folder_path
 
 

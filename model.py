@@ -5,12 +5,12 @@ import math
 from typing import Optional
 from dataclasses import dataclass
 
-    
+
 @dataclass
 class transformer_config:
     vocab_size: int
-    
-    
+
+
     embedding_size: int
 
     dropout_rate: float
@@ -23,7 +23,7 @@ class transformer_config:
 
 
     max_sequence_length: int
-    
+
 
     n_blocks: int
 
@@ -66,7 +66,7 @@ class xpos(torch.nn.Module):
 
 
         return queries, keys
-    
+
 
 
 
@@ -102,7 +102,7 @@ class transformer_cache(torch.nn.Module):
 
     def get_full_keys(self, block_number: int) -> torch.Tensor:
         return self.keys[..., block_number, :self.current_position, :, :]
-    
+
     def get_full_values(self, block_number: int) -> torch.Tensor:
         return self.values[..., block_number, :self.current_position, :, :]
 
@@ -111,13 +111,13 @@ class transformer_cache(torch.nn.Module):
 
     def get_previous_values(self, block_number: int) -> torch.Tensor:
         return self.values[..., block_number, :self.last_position, :, :]
-    
+
 
     def get_mask(self) -> torch.Tensor:
         return torch.ones(
             (self.current_position - self.last_position, self.current_position), dtype=torch.bool, **self.device_kwarg
         ).tril(self.last_position)
-        
+
 
 
 class transformer_attention(torch.nn.Module):
@@ -189,11 +189,11 @@ class transformer_attention(torch.nn.Module):
         return torch.nn.functional.dropout(
             self.attention_down(
                 attention.flatten(-2)
-            ), 
+            ),
             p = self.config.dropout_rate,
             training = self.training
         )
-    
+
 
 
 
@@ -220,7 +220,7 @@ class transformer_block(torch.nn.Module):
 
         self.attention = transformer_attention(config, block_number)
 
-    
+
     def forward(self, activations: torch.Tensor, cache: Optional[transformer_cache] = None) -> torch.Tensor:
         activations = activations + self.attention(self.first_ln(activations), cache)
         activations = activations + self.mlp(self.second_ln(activations))
@@ -229,22 +229,22 @@ class transformer_block(torch.nn.Module):
 
 
 
-    
+
 class transformer_network(torch.nn.Module):
     def __init__(self, config: transformer_config):
         super(transformer_network, self).__init__()
 
         self.config = config
 
-        
+
         self.blocks = torch.nn.ModuleList([transformer_block(config, block_number) for block_number in range(config.n_blocks)])
-        
-        
+
+
         self.wte = torch.nn.Embedding(config.vocab_size, config.embedding_size)
         torch.nn.init.normal_(self.wte.weight, mean = 0, std = 0.02)
 
         self.final_ln = torch.nn.LayerNorm(config.embedding_size, bias = False)
-        
+
         self.lm_head = torch.nn.Linear(config.embedding_size, config.vocab_size, bias = False)
         self.lm_head.weight = self.wte.weight
 
@@ -261,8 +261,8 @@ class transformer_network(torch.nn.Module):
 
         for block in self.blocks:
             embeddings = block(embeddings, cache)
-        
+
         embeddings = self.final_ln(embeddings)
         logits = self.lm_head(embeddings)
 
-        return logits  
+        return logits
