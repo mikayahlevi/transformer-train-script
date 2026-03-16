@@ -6,6 +6,7 @@ import colorama
 import argparse
 import prefixed
 import importlib
+import importlib.util
 from typing import Any
 
 import dataclasses
@@ -20,7 +21,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--device', type = str, default = 'cuda')
-    parser.add_argument('--pipeline', type = str, default = None)
+    parser.add_argument('--pipeline_name', type = str, default = None)
+    parser.add_argument('--pipeline_path', type = str, default = None)
     parser.add_argument('--compile', type = bool, default = False)
     parser.add_argument('--config_folder_path', type = str, default = 'config')
     parser.add_argument('--train_folder_dir', type = str, default = 'trains')
@@ -34,8 +36,10 @@ if __name__ == '__main__':
 
 
 
-    if args.pipeline is None:
+    if (args.pipeline_name is None) and (args.pipeline_path is None):
         raise ValueError('Pipeline must be specified with --pipeline argument.')
+    if (args.pipeline_name is not None) and (args.pipeline_path is not None):
+        raise ValueError('Pipeline must be specified with either --pipeline_name or --pipeline_path argument, not both.')
     if not os.path.exists(args.config_folder_path):
         raise ValueError(f'Config folder path {args.config_folder_path} does not exist.')
 
@@ -45,11 +49,17 @@ if __name__ == '__main__':
 
 
     # load the dataset module
-    pipeline_module = importlib.import_module(f'pipelines.{args.pipeline}')
+    if args.pipeline_name is not None:
+        pipeline_module = importlib.import_module(f'pipelines.{args.pipeline_name}')
 
+    if args.pipeline_path is not None:
+        spec = importlib.util.spec_from_file_location('pipeline_module', args.pipeline_path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f'Could not load pipeline module from path {args.pipeline_path}.')
+        pipeline_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(pipeline_module)
 
     # load the configs from the json files
-    traincfg, modelcfg, hparams = None, None, None
     with open(os.path.join(args.config_folder_path, 'traincfg.json'), 'r') as f:
         traincfg = train_config(**json.load(f))
     # override the traincfg with any cli args
