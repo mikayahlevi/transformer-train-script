@@ -26,6 +26,9 @@ parser.add_argument('--config_folder_path', type = str, default = 'config')
 parser.add_argument('--train_folder_dir', type = str, default = 'trains')
 parser.add_argument('--train_folder_name', type = str, default = None)
 
+for field in dataclasses.fields(train_config):
+    parser.add_argument(f'--{field.name}', type = type(getattr(train_config, field.name)), default = None)
+
 
 args = parser.parse_args()
 
@@ -49,6 +52,13 @@ if __name__ == '__main__':
     traincfg, modelcfg, hparams = None, None, None
     with open(os.path.join(args.config_folder_path, 'traincfg.json'), 'r') as f:
         traincfg = train_config(**json.load(f))
+    # override the traincfg with any cli args
+    for field in dataclasses.fields(traincfg):
+        cli_arg_value = getattr(args, field.name)
+        if cli_arg_value is not None:
+            setattr(traincfg, field.name, cli_arg_value)
+
+
     with open(os.path.join(args.config_folder_path, 'hparams.json'), 'r') as f:
         hparams = hyperparameter_config(**json.load(f))
 
