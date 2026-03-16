@@ -27,7 +27,7 @@ parser.add_argument('--train_folder_dir', type = str, default = 'trains')
 parser.add_argument('--train_folder_name', type = str, default = None)
 
 for field in dataclasses.fields(train_config):
-    parser.add_argument(f'--{field.name}', type = type(getattr(train_config, field.name)), default = None)
+    parser.add_argument(f'--{field.name}', type = field.type, default = None)
 
 
 args = parser.parse_args()
