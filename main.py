@@ -6,36 +6,43 @@ import colorama
 import argparse
 import prefixed
 import importlib
-from typing import Optional
+from typing import Optional, Any
 
 import dataclasses
 
 
 from model import transformer_network, transformer_config
 from train import train, train_config, hyperparameter_config
+from pipeline import pipeline_protocol
 
 
 
 parser = argparse.ArgumentParser()
 
 parser.add_argument('--device', type = str, default = 'cuda')
-parser.add_argument('--dataset', type = str)
+parser.add_argument('--pipeline', type = str, default = None)
 parser.add_argument('--compile', type = bool, default = False)
 parser.add_argument('--config_folder_path', type = str, default = 'config')
 parser.add_argument('--train_folder_dir', type = str, default = 'trains')
-parser.add_argument('--train_folder_name', type = Optional[str], default = None)
+parser.add_argument('--train_folder_name', type = str, default = None)
 
 
 args = parser.parse_args()
 
 
 if __name__ == '__main__':
+    if args.pipeline is None:
+        raise ValueError('Pipeline must be specified with --pipeline argument.')
+    if not os.path.exists(args.config_folder_path):
+        raise ValueError(f'Config folder path {args.config_folder_path} does not exist.')
+
+
     if not os.path.exists('data'):
         os.makedirs('data')
 
 
     # load the dataset module
-    dataset_module = importlib.import_module(f'custom_datasets.{args.dataset}')
+    pipeline_module = importlib.import_module(f'pipelines.{args.pipeline}')
 
 
     # load the configs from the json files
@@ -45,15 +52,17 @@ if __name__ == '__main__':
     with open(os.path.join(args.config_folder_path, 'hparams.json'), 'r') as f:
         hparams = hyperparameter_config(**json.load(f))
 
+    # create the pipeline and get the dataset and tokenizer
+    pipeline: pipeline_protocol[Any] = pipeline_module.main_pipeline()
 
-    dataset, tokenizer = dataset_module.get_dataset_and_tokenizer(traincfg.sequence_length)
+    dataset, tokenizer = pipeline.get_dataset_and_tokenizer(sequence_length = traincfg.sequence_length)
 
     with open(os.path.join(args.config_folder_path, 'modelcfg.json'), 'r') as f:
         # set the model's vocab size to the dataset's vocab size
-        modelcfg = transformer_config(**json.load(f), vocab_size = tokenizer.get_vocab_size())
+        modelcfg = transformer_config(**json.load(f), vocab_size = pipeline.get_vocab_size(tokenizer))
 
 
-    # create the path to log the info and dump the configs as jsons
+    # choose and create the path to log the info and dump the configs as jsons
     train_folder_path = None
 
     if args.train_folder_name is None:

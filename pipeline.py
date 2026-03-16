@@ -1,0 +1,28 @@
+import typing
+import datasets
+from typing import Any, Protocol, TypeVar
+
+
+tokenizer_type = TypeVar('tokenizer_type')
+
+class pipeline_protocol(Protocol[tokenizer_type]):
+    def get_dataset_and_tokenizer(self, **kwargs: Any) -> tuple[datasets.DatasetDict, tokenizer_type]:
+        ...
+
+    def cache_dataset(self, dataset: datasets.DatasetDict, path: str) -> None:
+        ...
+
+    def save_tokenizer(self, tokenizer: tokenizer_type, path: str) -> None:
+        ...
+
+    def load_tokenizer(self, path: str) -> tokenizer_type:
+        ...
+
+    def encode_text(self, tokenizer: tokenizer_type, text: str) -> list[int]:
+        ...
+
+    def decode_ids(self, tokenizer: tokenizer_type, ids: list[int]) -> str:
+        ...
+
+    def get_vocab_size(self, tokenizer: tokenizer_type) -> int:
+        ...
