@@ -6,7 +6,7 @@ import colorama
 import argparse
 import prefixed
 import importlib
-from typing import Optional, Any
+from typing import Any
 
 import dataclasses
 
@@ -16,24 +16,24 @@ from train import train, train_config, hyperparameter_config
 from pipeline import pipeline_protocol
 
 
-
-parser = argparse.ArgumentParser()
-
-parser.add_argument('--device', type = str, default = 'cuda')
-parser.add_argument('--pipeline', type = str, default = None)
-parser.add_argument('--compile', type = bool, default = False)
-parser.add_argument('--config_folder_path', type = str, default = 'config')
-parser.add_argument('--train_folder_dir', type = str, default = 'trains')
-parser.add_argument('--train_folder_name', type = str, default = None)
-
-for field in dataclasses.fields(train_config):
-    parser.add_argument(f'--{field.name}', type = field.type, default = None)
-
-
-args = parser.parse_args()
-
-
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--device', type = str, default = 'cuda')
+    parser.add_argument('--pipeline', type = str, default = None)
+    parser.add_argument('--compile', type = bool, default = False)
+    parser.add_argument('--config_folder_path', type = str, default = 'config')
+    parser.add_argument('--train_folder_dir', type = str, default = 'trains')
+    parser.add_argument('--train_folder_name', type = str, default = None)
+
+    for field in dataclasses.fields(train_config):
+        parser.add_argument(f'--{field.name}', type = field.type, default = None)
+
+
+    args = parser.parse_args()
+
+
+
     if args.pipeline is None:
         raise ValueError('Pipeline must be specified with --pipeline argument.')
     if not os.path.exists(args.config_folder_path):
