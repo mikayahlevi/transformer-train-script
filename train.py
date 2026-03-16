@@ -154,7 +154,7 @@ def train(settings, hyperparameters, model, dataset, device):
 
 
 
-        pin_device_args = {} if device == 'cpu' else {'pin_memory': True, 'pin_memory_device': device}
+        pin_device_args = {} if device == 'cpu' else {'pin_memory': True}
 
         train_dataloader = torch.utils.data.DataLoader(dataset['train'], batch_size = settings.batch_size, shuffle = True, **pin_device_args)
         val_dataloader = torch.utils.data.DataLoader(dataset['validation'], batch_size = settings.batch_size, shuffle = True, **pin_device_args)
