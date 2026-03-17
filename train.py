@@ -268,7 +268,7 @@ def train(settings, hyperparameters, model, dataset, device):
 
 
             if (step + 1) % settings.save_checkpoint_interval == 0:
-                torch.save(model.state_dict(), os.path.join(settings.train_folder_path, 'models', 'checkpoint-' + 'step-' + str(step + 1) + '.pt'))
+                torch.save(model, os.path.join(settings.train_folder_path, 'models', 'checkpoint-' + 'step-' + str(step + 1) + '.pt'))
 
         print(colorama.Fore.GREEN)
         print('training finished:', settings.total_steps, 'steps completed')
