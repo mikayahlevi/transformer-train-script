@@ -1,5 +1,6 @@
 import requests
 import datasets
+import torch
 
 import os
 
@@ -77,11 +78,15 @@ class main_pipeline:
 
         return character_tokenizer(vocab)
 
-    def encode_text(self, tokenizer: character_tokenizer, text: str) -> list[int]:
-        return tokenizer.encode(text)
+    def encode_text(self, tokenizer: character_tokenizer, text: str) -> torch.Tensor:
+        return torch.Tensor(tokenizer.encode(text))
 
-    def decode_ids(self, tokenizer: character_tokenizer, ids: list[int]) -> str:
-        return tokenizer.decode(ids)
+    def decode_ids(self, tokenizer: character_tokenizer, ids: torch.Tensor) -> str:
+        assert ids.dim() == 1, 'ids must be a 1-dimensional tensor'
+        return tokenizer.decode(ids.tolist())
 
     def get_vocab_size(self, tokenizer: character_tokenizer) -> int:
         return tokenizer.get_vocab_size()
+
+    def should_halt_generation(self, tokenizer: character_tokenizer, last_token_id: int) -> bool:
+        return False

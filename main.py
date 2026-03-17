@@ -35,29 +35,28 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
 
-
-    if (args.pipeline_name is None) and (args.pipeline_path is None):
-        raise ValueError('Pipeline must be specified with --pipeline argument.')
-    if (args.pipeline_name is not None) and (args.pipeline_path is not None):
-        raise ValueError('Pipeline must be specified with either --pipeline_name or --pipeline_path argument, not both.')
     if not os.path.exists(args.config_folder_path):
         raise ValueError(f'Config folder path {args.config_folder_path} does not exist.')
 
 
-    if not os.path.exists('data'):
-        os.makedirs('data')
-
-
     # load the dataset module
-    if args.pipeline_name is not None:
+    if (args.pipeline_name is not None) and (args.pipeline_path is not None):
+        raise ValueError('Pipeline must be specified with either --pipeline_name or --pipeline_path argument, not both.')
+    elif args.pipeline_name is not None:
         pipeline_module = importlib.import_module(f'pipelines.{args.pipeline_name}')
-
-    if args.pipeline_path is not None:
+    elif args.pipeline_path is not None:
         spec = importlib.util.spec_from_file_location('pipeline_module', args.pipeline_path)
         if spec is None or spec.loader is None:
             raise ImportError(f'Could not load pipeline module from path {args.pipeline_path}.')
         pipeline_module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(pipeline_module)
+    else:
+        raise ValueError('Pipeline must be specified with either --pipeline_name or --pipeline_path argument.')
+
+
+    if not os.path.exists('data'):
+        os.makedirs('data')
+
 
     # load the configs from the json files
     with open(os.path.join(args.config_folder_path, 'traincfg.json'), 'r') as f:

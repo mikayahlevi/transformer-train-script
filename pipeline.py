@@ -1,6 +1,7 @@
-import typing
+import torch
 import datasets
 from typing import Any, Protocol, TypeVar
+
 
 
 tokenizer_type = TypeVar('tokenizer_type')
@@ -18,11 +19,14 @@ class pipeline_protocol(Protocol[tokenizer_type]):
     def load_tokenizer(self, path: str) -> tokenizer_type:
         ...
 
-    def encode_text(self, tokenizer: tokenizer_type, text: str) -> list[int]:
+    def encode_text(self, tokenizer: tokenizer_type, text: str) -> torch.Tensor:
         ...
 
-    def decode_ids(self, tokenizer: tokenizer_type, ids: list[int]) -> str:
+    def decode_ids(self, tokenizer: tokenizer_type, ids: torch.Tensor) -> str:
         ...
 
     def get_vocab_size(self, tokenizer: tokenizer_type) -> int:
+        ...
+
+    def should_halt_generation(self, tokenizer: tokenizer_type, last_token_id: int) -> bool:
         ...
