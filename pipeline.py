@@ -10,7 +10,10 @@ class pipeline_protocol(Protocol[tokenizer_type]):
     def get_dataset_and_tokenizer(self, **kwargs: Any) -> tuple[datasets.DatasetDict, tokenizer_type]:
         ...
 
-    def cache_dataset(self, dataset: datasets.DatasetDict, path: str) -> None:
+    def save_dataset(self, dataset: datasets.DatasetDict, path: str) -> None:
+        ...
+
+    def load_dataset(self, path: str) -> datasets.DatasetDict:
         ...
 
     def save_tokenizer(self, tokenizer: tokenizer_type, path: str) -> None:

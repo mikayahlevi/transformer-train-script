@@ -27,6 +27,8 @@ if __name__ == '__main__':
     parser.add_argument('--config-folder-path', type = str, default = 'config')
     parser.add_argument('--train-folder-dir', type = str, default = 'trains')
     parser.add_argument('--train-folder-name', type = str, default = None)
+    parser.add_argument('--dataset-save-path', type = str, default = None)
+    parser.add_argument('--tokenizer-save-path', type = str, default = None)
 
     for field in dataclasses.fields(train_config):
         # format the names to replace underscores with dashes for the cli arguments
@@ -76,6 +78,11 @@ if __name__ == '__main__':
     pipeline: pipeline_protocol[Any] = pipeline_module.main_pipeline()
 
     dataset, tokenizer = pipeline.get_dataset_and_tokenizer(sequence_length = traincfg.sequence_length)
+
+    if args.dataset_save_path is not None:
+        pipeline.save_dataset(dataset, args.dataset_save_path)
+    if args.tokenizer_save_path is not None:
+        pipeline.save_tokenizer(tokenizer, args.tokenizer_save_path)
 
     with open(os.path.join(args.config_folder_path, 'modelcfg.json'), 'r') as f:
         # set the model's vocab size to the dataset's vocab size

@@ -31,9 +31,6 @@ class character_tokenizer:
 
 class main_pipeline:
     def get_dataset_and_tokenizer(self, sequence_length: int) -> tuple[datasets.DatasetDict, character_tokenizer]:
-        if not os.path.exists('data/shakespeare_char'):
-            os.makedirs('data/shakespeare_char')
-
         dataset, vocab = None, None
 
         text = requests.get('https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt').text
@@ -63,8 +60,11 @@ class main_pipeline:
 
         return dataset.with_format(type = 'torch', columns = ['ids']), tokenizer
 
-    def cache_dataset(self, dataset: datasets.DatasetDict, path: str):
+    def save_dataset(self, dataset: datasets.DatasetDict, path: str):
         dataset.save_to_disk(path)
+
+    def load_dataset(self, path: str) -> datasets.DatasetDict:
+        return datasets.DatasetDict.load_from_disk(path)
 
     def save_tokenizer(self, tokenizer: character_tokenizer, path: str):
         # dump the vocab
