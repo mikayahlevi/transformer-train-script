@@ -1,8 +1,7 @@
 import requests
 import datasets
 import torch
-
-import os
+import pickle
 
 class character_tokenizer:
     def __init__(self, vocab):
@@ -69,17 +68,16 @@ class main_pipeline:
     def save_tokenizer(self, tokenizer: character_tokenizer, path: str):
         # dump the vocab
         with open(path, 'wb') as f:
-            for token in tokenizer.vocab:
-                f.write(token.encode('utf-8') + b'\n')
+            pickle.dump(tokenizer.vocab, f)
 
     def load_tokenizer(self, path: str) -> character_tokenizer:
         with open(path, 'rb') as f:
-            vocab = [line.strip().decode('utf-8') for line in f]
+            vocab = pickle.load(f)
 
         return character_tokenizer(vocab)
 
     def encode_text(self, tokenizer: character_tokenizer, text: str) -> torch.Tensor:
-        return torch.Tensor(tokenizer.encode(text))
+        return torch.Tensor(tokenizer.encode(text)).long()
 
     def decode_ids(self, tokenizer: character_tokenizer, ids: torch.Tensor) -> str:
         assert ids.dim() == 1, 'ids must be a 1-dimensional tensor'
