@@ -21,15 +21,16 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--device', type = str, default = 'cuda')
-    parser.add_argument('--pipeline_name', type = str, default = None)
-    parser.add_argument('--pipeline_path', type = str, default = None)
+    parser.add_argument('--pipeline-name', type = str, default = None)
+    parser.add_argument('--pipeline-path', type = str, default = None)
     parser.add_argument('--compile', type = bool, default = False)
-    parser.add_argument('--config_folder_path', type = str, default = 'config')
-    parser.add_argument('--train_folder_dir', type = str, default = 'trains')
-    parser.add_argument('--train_folder_name', type = str, default = None)
+    parser.add_argument('--config-folder-path', type = str, default = 'config')
+    parser.add_argument('--train-folder-dir', type = str, default = 'trains')
+    parser.add_argument('--train-folder-name', type = str, default = None)
 
     for field in dataclasses.fields(train_config):
-        parser.add_argument(f'--{field.name}', type = field.type, default = None)
+        # format the names to replace underscores with dashes for the cli arguments
+        parser.add_argument(f'--{field.name.replace('_', '-')}', type = field.type, default = None)
 
 
     args = parser.parse_args()
