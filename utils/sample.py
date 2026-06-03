@@ -5,7 +5,7 @@ import importlib.util
 import colorama
 
 from model import transformer_cache, transformer_network
-from pipeline import pipeline_protocol
+from pipeline import pipeline_protocol, get_pipeline
 from typing import Any
 
 @torch.inference_mode()
@@ -54,20 +54,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    if (args.pipeline_name is not None) and (args.pipeline_path is not None):
-        raise ValueError('Pipeline must be specified with either --pipeline-name or --pipeline-path argument, not both.')
-    elif args.pipeline_name is not None:
-        pipeline_module = importlib.import_module(f'pipelines.{args.pipeline_name}')
-    elif args.pipeline_path is not None:
-        spec = importlib.util.spec_from_file_location('pipeline_module', args.pipeline_path)
-        if spec is None or spec.loader is None:
-            raise ImportError(f'Could not load pipeline module from path {args.pipeline_path}.')
-        pipeline_module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(pipeline_module)
-    else:
-        raise ValueError('Pipeline must be specified with either --pipeline-name or --pipeline-path argument.')
-
-    pipeline = pipeline_module.main_pipeline()
+    pipeline = get_pipeline(args)
 
     model = torch.load(args.model_path, map_location = args.device, weights_only = False)
     tokenizer = pipeline.load_tokenizer(args.tokenizer_path)

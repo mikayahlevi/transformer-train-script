@@ -1,19 +1,28 @@
 import torch
-import datasets
-from typing import Any, Protocol, TypeVar
+import argparse
+import importlib
+import importlib.util
+from typing import Any, Protocol, TypeVar, Optional
 
 
 
 tokenizer_type = TypeVar('tokenizer_type')
+dataset_type = TypeVar('dataset_type')
 
-class pipeline_protocol(Protocol[tokenizer_type]):
-    def get_dataset_and_tokenizer(self, **kwargs: Any) -> tuple[datasets.DatasetDict, tokenizer_type]:
+class pipeline_protocol(Protocol[dataset_type, tokenizer_type]):
+    def get_dataset_and_tokenizer(self, sequence_length: int) -> tuple[dataset_type, tokenizer_type]:
         ...
 
-    def save_dataset(self, dataset: datasets.DatasetDict, path: str) -> None:
+    def get_dataloaders(self, dataset: dataset_type, **dataloader_args: Any) -> tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
         ...
 
-    def load_dataset(self, path: str) -> datasets.DatasetDict:
+    def get_training_pairs(self, batch: torch.Tensor, tokenizer: Optional[tokenizer_type] = None) -> tuple[torch.Tensor, torch.Tensor]:
+        ...
+
+    def save_dataset(self, dataset: dataset_type, path: str) -> None:
+        ...
+
+    def load_dataset(self, path: str) -> dataset_type:
         ...
 
     def save_tokenizer(self, tokenizer: tokenizer_type, path: str) -> None:
@@ -33,3 +42,24 @@ class pipeline_protocol(Protocol[tokenizer_type]):
 
     def should_halt_generation(self, tokenizer: tokenizer_type, last_token_id: int) -> bool:
         ...
+
+    # returns all tokens that should not contribute to the loss, such as the pad or eos tokens
+    def get_non_contributing_tokens(self, tokenizer: tokenizer_type) -> list[int]:
+        ...
+
+
+def get_pipeline(args: argparse.Namespace) -> pipeline_protocol[Any, Any]:
+    if (args.pipeline_name is not None) and (args.pipeline_path is not None):
+        raise ValueError('arguments --pipeline_name and --pipeline_path cannot both be set')
+    elif args.pipeline_name is not None:
+        pipeline_module = importlib.import_module(f'pipelines.{args.pipeline_name}')
+    elif args.pipeline_path is not None:
+        spec = importlib.util.spec_from_file_location('pipeline_module', args.pipeline_path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f'Could not load pipeline module from path {args.pipeline_path}.')
+        pipeline_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(pipeline_module)
+    else:
+        raise ValueError('pipeline must be specified with either --pipeline_name or --pipeline_path argument')
+
+    return pipeline_module.main_pipeline()

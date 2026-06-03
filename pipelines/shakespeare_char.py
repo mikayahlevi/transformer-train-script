@@ -2,6 +2,10 @@ import requests
 import datasets
 import torch
 import pickle
+from typing import cast, Any, Optional
+
+
+from ..pipeline import pipeline_protocol
 
 class character_tokenizer:
     def __init__(self, vocab):
@@ -28,7 +32,7 @@ class character_tokenizer:
         return self.vocab_size
 
 
-class main_pipeline:
+class main_pipeline(pipeline_protocol[datasets.DatasetDict, character_tokenizer]):
     def get_dataset_and_tokenizer(self, sequence_length: int) -> tuple[datasets.DatasetDict, character_tokenizer]:
         dataset, vocab = None, None
 
@@ -59,6 +63,18 @@ class main_pipeline:
 
         return dataset.with_format(type = 'torch', columns = ['ids']), tokenizer
 
+    def get_dataloaders(self, dataset: datasets.DatasetDict, **dataloader_args: Any) -> tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
+        train_dataloader = torch.utils.data.DataLoader(cast(torch.utils.data.Dataset, dataset['train']), **dataloader_args)
+        val_dataloader = torch.utils.data.DataLoader(cast(torch.utils.data.Dataset, dataset['validation']), **dataloader_args)
+
+        return train_dataloader, val_dataloader
+
+    def get_training_pairs(self, batch: torch.Tensor, tokenizer: Optional[character_tokenizer] = None) -> tuple[torch.Tensor, torch.Tensor]:
+        inputs = batch[:, :-1]
+        targets = batch[:, 1:]
+
+        return inputs, targets
+
     def save_dataset(self, dataset: datasets.DatasetDict, path: str):
         dataset.save_to_disk(path)
 
@@ -88,3 +104,6 @@ class main_pipeline:
 
     def should_halt_generation(self, tokenizer: character_tokenizer, last_token_id: int) -> bool:
         return False
+
+    def get_non_contributing_tokens(self, tokenizer: character_tokenizer) -> list[int]:
+        return []
