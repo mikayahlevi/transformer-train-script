@@ -12,7 +12,7 @@ from typing import Any
 def sample(model, pipeline: pipeline_protocol[Any], tokenizer, prefix: str, temperature: float, max_length: int, device: torch.device) -> str:
     encoded_prefix = pipeline.encode_text(tokenizer, prefix)
 
-    cache = transformer_cache(model.config, device = device)
+    cache = transformer_cache(model.config).to(device)
 
     logits = model.forward(encoded_prefix.to(device), cache).squeeze(-3)
 

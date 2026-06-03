@@ -71,7 +71,7 @@ class xpos(torch.nn.Module):
 
 
 class transformer_cache(torch.nn.Module):
-    def __init__(self, config: transformer_config, proceeding_dimensions: tuple[int, ...] = (1,), device: Optional[str] = None):
+    def __init__(self, config: transformer_config, proceeding_dimensions: tuple[int, ...] = (1,)):
         super(transformer_cache, self).__init__()
 
         self.config = config
@@ -80,52 +80,53 @@ class transformer_cache(torch.nn.Module):
         self.last_position = 0
         self.current_position = 0
 
-
-        self.device_kwarg = {} if device is None else {'device': device}
-
-        self.keys = torch.empty(proceeding_dimensions + (config.n_blocks, config.max_sequence_length, config.n_attn_heads, config.key_size // config.n_attn_heads), **self.device_kwarg)
-        self.values = torch.empty(proceeding_dimensions + (config.n_blocks, config.max_sequence_length, config.n_attn_heads, config.value_size // config.n_attn_heads), **self.device_kwarg)
+        self.keys = torch.nn.Buffer(torch.empty(
+            proceeding_dimensions + (config.n_blocks, config.max_sequence_length, config.n_attn_heads, config.key_size // config.n_attn_heads)
+        ))
+        self.values = torch.nn.Buffer(torch.empty(
+            proceeding_dimensions + (config.n_blocks, config.max_sequence_length, config.n_attn_heads, config.value_size // config.n_attn_heads)
+        ))
 
     def increment_position(self, amount: int):
         self.last_position = self.current_position
         self.current_position += amount
 
     def reset(self):
-        self.last_position = 1
-        self.current_position = 1
+        self.last_position = 0
+        self.current_position = 0
 
-    def append_keys(self, keys: torch.Tensor, block_number: int):
-        self.keys[..., block_number, self.last_position:self.current_position, :, :] = keys
+    def append_keys(self, keys: torch.Tensor, block_index: int):
+        self.keys[..., block_index, self.last_position:self.current_position, :, :] = keys
 
-    def append_values(self, values: torch.Tensor, block_number: int):
-        self.values[..., block_number, self.last_position:self.current_position, :, :] = values
+    def append_values(self, values: torch.Tensor, block_index: int):
+        self.values[..., block_index, self.last_position:self.current_position, :, :] = values
 
-    def get_full_keys(self, block_number: int) -> torch.Tensor:
-        return self.keys[..., block_number, :self.current_position, :, :]
+    def get_full_keys(self, block_index: int) -> torch.Tensor:
+        return self.keys[..., block_index, :self.current_position, :, :]
 
-    def get_full_values(self, block_number: int) -> torch.Tensor:
-        return self.values[..., block_number, :self.current_position, :, :]
+    def get_full_values(self, block_index: int) -> torch.Tensor:
+        return self.values[..., block_index, :self.current_position, :, :]
 
-    def get_previous_keys(self, block_number: int) -> torch.Tensor:
-        return self.keys[..., block_number, :self.last_position, :, :]
+    def get_previous_keys(self, block_index: int) -> torch.Tensor:
+        return self.keys[..., block_index, :self.last_position, :, :]
 
-    def get_previous_values(self, block_number: int) -> torch.Tensor:
-        return self.values[..., block_number, :self.last_position, :, :]
+    def get_previous_values(self, block_index: int) -> torch.Tensor:
+        return self.values[..., block_index, :self.last_position, :, :]
 
 
     def get_mask(self) -> torch.Tensor:
         return torch.ones(
-            (self.current_position - self.last_position, self.current_position), dtype=torch.bool, **self.device_kwarg
+            (self.current_position - self.last_position, self.current_position), dtype = torch.bool, device = self.keys.device
         ).tril(self.last_position)
 
 
 
 class transformer_attention(torch.nn.Module):
-    def __init__(self, config, block_number: int):
+    def __init__(self, config, block_index: int):
         super(transformer_attention, self).__init__()
 
 
-        self.block_number = block_number
+        self.block_index = block_index
 
         self.config = config
 
@@ -169,20 +170,18 @@ class transformer_attention(torch.nn.Module):
         )
 
 
-        mask_kwarg = {}
         if use_cache:
-            mask_kwarg['attn_mask'] = cache.get_mask()
-            cache.append_keys(keys, self.block_number)
-            cache.append_values(values, self.block_number)
+            cache.append_keys(keys, self.block_index)
+            cache.append_values(values, self.block_index)
 
         # transpose to switch the sequence and head dimensions
         attention = torch.nn.functional.scaled_dot_product_attention(
             queries.transpose(-3, -2),
-            (cache.get_full_keys(self.block_number) if use_cache else keys).transpose(-3, -2),
-            (cache.get_full_values(self.block_number) if use_cache else values).transpose(-3, -2),
+            (cache.get_full_keys(self.block_index) if use_cache else keys).transpose(-3, -2),
+            (cache.get_full_values(self.block_index) if use_cache else values).transpose(-3, -2),
             is_causal = not use_cache,
             dropout_p = self.config.dropout_rate if self.training else 0.0,
-            **mask_kwarg
+            attn_mask = cache.get_mask() if use_cache else None
         ).transpose(-3, -2)
 
 
@@ -199,7 +198,7 @@ class transformer_attention(torch.nn.Module):
 
 
 class transformer_block(torch.nn.Module):
-    def __init__(self, config: transformer_config, block_number: int):
+    def __init__(self, config: transformer_config, block_index: int):
         super(transformer_block, self).__init__()
 
         self.config = config
@@ -218,7 +217,7 @@ class transformer_block(torch.nn.Module):
         torch.nn.init.normal_(self.mlp[0].weight, mean = 0, std = 0.02)
         torch.nn.init.normal_(self.mlp[2].weight, mean = 0, std = 0.02 / math.sqrt(2 * config.n_blocks))
 
-        self.attention = transformer_attention(config, block_number)
+        self.attention = transformer_attention(config, block_index)
 
 
     def forward(self, activations: torch.Tensor, cache: Optional[transformer_cache] = None) -> torch.Tensor:
@@ -237,7 +236,7 @@ class transformer_network(torch.nn.Module):
         self.config = config
 
 
-        self.blocks = torch.nn.ModuleList([transformer_block(config, block_number) for block_number in range(config.n_blocks)])
+        self.blocks = torch.nn.ModuleList([transformer_block(config, block_index) for block_index in range(config.n_blocks)])
 
 
         self.wte = torch.nn.Embedding(config.vocab_size, config.embedding_size)
