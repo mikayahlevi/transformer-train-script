@@ -5,7 +5,7 @@ import pickle
 from typing import cast, Any, Optional
 
 
-from ..pipeline import pipeline_protocol
+from pipeline import pipeline_protocol
 
 class character_tokenizer:
     def __init__(self, vocab):

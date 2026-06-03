@@ -19,12 +19,11 @@ class train_config:
     batch_size: int
 
 
-    total_steps: int = 5000
+    total_steps: int
 
+    update_interval: int
 
-    update_interval: int = 1
-
-    schedule_interval: int = 20
+    schedule_interval: int
 
 
 
