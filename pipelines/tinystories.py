@@ -16,15 +16,17 @@ class main_pipeline(pipeline_protocol[datasets.DatasetDict, transformers.PreTrai
         def repack_ids(examples):
             concatenated_ids = sum(examples["input_ids"], [])
             total_length = len(concatenated_ids)
-            block_size = sequence_length + 1
 
-            if total_length >= block_size:
-                total_length = (total_length // block_size) * block_size
-            else:
-                total_length = 0
+            n_chunks = total_length // sequence_length
 
+            # we need one more token than the number of tokens in the chunks
+            # so decrement n_chunks if the single extra token is not available
+            if sequence_length * n_chunks + 1 > total_length:
+                n_chunks -= 1
+
+            # the last token of the ith chunk is the first token of the (i + 1)th chunk
             return {
-                "input_ids": [concatenated_ids[i : i + block_size] for i in range(0, total_length, block_size)]
+                "input_ids": [concatenated_ids[i : i + sequence_length + 1] for i in range(0, n_chunks * sequence_length, sequence_length)]
             }
 
 
