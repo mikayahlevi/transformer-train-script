@@ -53,7 +53,7 @@ class main_pipeline(pipeline_protocol[datasets.DatasetDict, transformers.PreTrai
 
         return train_dataloader, val_dataloader
 
-    def get_training_pairs(self, batch: torch.Tensor, tokenizer: Optional[transformers.PreTrainedTokenizerFast] = None) -> tuple[torch.Tensor, torch.Tensor]:
+    def get_training_pairs(self, batch: torch.Tensor, tokenizer: transformers.PreTrainedTokenizerFast, mask_value: int) -> tuple[torch.Tensor, torch.Tensor]:
         inputs = batch[:, :-1]
         targets = batch[:, 1:]
 
@@ -85,6 +85,3 @@ class main_pipeline(pipeline_protocol[datasets.DatasetDict, transformers.PreTrai
 
     def should_halt_generation(self, tokenizer: transformers.PreTrainedTokenizerFast, last_token_id: int) -> bool:
         return last_token_id == tokenizer.eos_token_id
-
-    def get_non_contributing_tokens(self, tokenizer: transformers.PreTrainedTokenizerFast) -> list[int]:
-        return []

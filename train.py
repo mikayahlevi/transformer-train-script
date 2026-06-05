@@ -124,14 +124,9 @@ def train(
     train_dataloader, val_dataloader = pipeline.get_dataloaders(dataset, batch_size = settings.batch_size, shuffle = True, pin_memory = (device == 'cuda'))
 
 
-    non_contributing_tokens: list[int] = pipeline.get_non_contributing_tokens(tokenizer)
+    mask_value = -100
 
-    if len(non_contributing_tokens) > 1:
-        raise NotImplementedError('multiple non-contributing tokens not yet supported')
-    elif non_contributing_tokens:
-        criterion = torch.nn.CrossEntropyLoss(reduction = 'mean', ignore_index = non_contributing_tokens[0])
-    else:
-        criterion = torch.nn.CrossEntropyLoss(reduction = 'mean')
+    criterion = torch.nn.CrossEntropyLoss(reduction = 'mean', ignore_index = mask_value)
 
 
     optimizer = configure_optimizer(model, hyperparameters)
@@ -155,7 +150,7 @@ def train(
 
         ids = next(iter(train_dataloader))['ids'].to(device)
 
-        inputs, labels = pipeline.get_training_pairs(ids)
+        inputs, labels = pipeline.get_training_pairs(ids, tokenizer,  mask_value)
 
         logits = model(inputs)
 
@@ -195,8 +190,7 @@ def train(
             model.eval()
             with torch.inference_mode():
                 for val_item in iter(val_dataloader):
-                    val_ids = val_item['ids'].to(device)
-                    val_inputs, val_labels = val_ids[..., :-1], val_ids[..., 1:]
+                    val_inputs, val_labels = pipeline.get_training_pairs(val_item['ids'].to(device), tokenizer, mask_value)
 
                     val_logits = model(val_inputs)
 

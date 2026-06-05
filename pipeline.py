@@ -16,7 +16,8 @@ class pipeline_protocol(Protocol[dataset_type, tokenizer_type]):
     def get_dataloaders(self, dataset: dataset_type, **dataloader_args: Any) -> tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
         ...
 
-    def get_training_pairs(self, batch: torch.Tensor, tokenizer: Optional[tokenizer_type] = None) -> tuple[torch.Tensor, torch.Tensor]:
+    # if a example has tokens that shouldn't contribute to the loss, they should be replaced with the mask value.
+    def get_training_pairs(self, batch: torch.Tensor, tokenizer: tokenizer_type, mask_value: int) -> tuple[torch.Tensor, torch.Tensor]:
         ...
 
     def save_dataset(self, dataset: dataset_type, path: str) -> None:
@@ -41,10 +42,6 @@ class pipeline_protocol(Protocol[dataset_type, tokenizer_type]):
         ...
 
     def should_halt_generation(self, tokenizer: tokenizer_type, last_token_id: int) -> bool:
-        ...
-
-    # returns all tokens that should not contribute to the loss, such as the pad or eos tokens
-    def get_non_contributing_tokens(self, tokenizer: tokenizer_type) -> list[int]:
         ...
 
 

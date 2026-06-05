@@ -69,7 +69,7 @@ class main_pipeline(pipeline_protocol[datasets.DatasetDict, character_tokenizer]
 
         return train_dataloader, val_dataloader
 
-    def get_training_pairs(self, batch: torch.Tensor, tokenizer: Optional[character_tokenizer] = None) -> tuple[torch.Tensor, torch.Tensor]:
+    def get_training_pairs(self, batch: torch.Tensor, tokenizer: character_tokenizer, mask_value: int) -> tuple[torch.Tensor, torch.Tensor]:
         inputs = batch[:, :-1]
         targets = batch[:, 1:]
 
@@ -104,6 +104,3 @@ class main_pipeline(pipeline_protocol[datasets.DatasetDict, character_tokenizer]
 
     def should_halt_generation(self, tokenizer: character_tokenizer, last_token_id: int) -> bool:
         return False
-
-    def get_non_contributing_tokens(self, tokenizer: character_tokenizer) -> list[int]:
-        return []
