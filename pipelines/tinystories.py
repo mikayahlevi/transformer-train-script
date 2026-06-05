@@ -37,7 +37,7 @@ class main_pipeline(pipeline_protocol[datasets.DatasetDict, transformers.PreTrai
             num_proc = 8,
         )
 
-        dataset = dataset.remove_columns([col for col in dataset.column_names if col != "input_ids"])
+        dataset = dataset.remove_columns([col for col in dataset["train"].column_names if col != "input_ids"])
 
         dataset = dataset.map(
             repack_ids,
