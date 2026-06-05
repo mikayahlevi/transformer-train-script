@@ -9,7 +9,7 @@ from pipeline import pipeline_protocol, get_pipeline
 from typing import Any
 
 @torch.inference_mode()
-def sample(model, pipeline: pipeline_protocol[Any], tokenizer, prefix: str, temperature: float, max_length: int, device: torch.device) -> str:
+def sample(model, pipeline: pipeline_protocol[Any, Any], tokenizer, prefix: str, temperature: float, max_length: int, device: torch.device) -> str:
     encoded_prefix = pipeline.encode_text(tokenizer, prefix)
 
     cache = transformer_cache(model.config).to(device)
