@@ -148,9 +148,10 @@ def train(
     for step in range(settings.total_steps):
         model.train()
 
-        ids = next(iter(train_dataloader))['ids'].to(device)
+        ids = next(iter(train_dataloader))['ids']
 
         inputs, labels = pipeline.get_training_pairs(ids, tokenizer,  mask_value)
+        inputs, labels = inputs.to(device), labels.to(device)
 
         logits = model(inputs)
 
@@ -190,7 +191,8 @@ def train(
             model.eval()
             with torch.inference_mode():
                 for val_item in iter(val_dataloader):
-                    val_inputs, val_labels = pipeline.get_training_pairs(val_item['ids'].to(device), tokenizer, mask_value)
+                    val_inputs, val_labels = pipeline.get_training_pairs(val_item['ids'], tokenizer, mask_value)
+                    val_inputs, val_labels = val_inputs.to(device), val_labels.to(device)
 
                     val_logits = model(val_inputs)
 
