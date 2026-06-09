@@ -220,7 +220,7 @@ class transformer_block(torch.nn.Module):
 
 
     def forward(self, activations: torch.Tensor, cache: Optional[transformer_cache] = None) -> torch.Tensor:
-        activations = activations + self.attention(self.first_ln(activations), cache)
+        activations = activations + self.attn(self.first_ln(activations), cache)
         activations = activations + self.mlp(self.second_ln(activations))
         return activations
 
