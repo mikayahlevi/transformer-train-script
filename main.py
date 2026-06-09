@@ -142,6 +142,8 @@ if __name__ == '__main__':
     parser.add_argument('--train-cfg-path', type = str, default = None)
     parser.add_argument('--hprms-cfg-path', type = str, default = None)
 
+    parser.add_argument('--checkpoint-load-path', type = str, default = None, help = 'path to a checkpoint to load and resume training from')
+
 
     # add overrides for all config values as cli arguments
     for config in [train_config, hyperparameter_config, transformer_config]:
@@ -227,12 +229,30 @@ if __name__ == '__main__':
                 file.write(f'step: {step + 1}  {metric}: {value:.6f}\n')
 
 
+    checkpoint = None
+    if args.load_checkpoint_path is not None:
+        if not os.path.exists(args.load_checkpoint_path):
+            raise ValueError(f'checkpoint load path {args.load_checkpoint_path} does not exist')
+
+        checkpoint = torch.load(args.load_checkpoint_path, map_location = args.device)
+        print(colorama.Fore.BLUE)
+        print(f'loaded checkpoint from {args.load_checkpoint_path}')
+        print(colorama.Style.RESET_ALL, end='')
+
+
     model = transformer_network(model_cfg).to(args.device)
+
+    # load the state dict before training, everything else is loaded in the train function
+    if checkpoint is not None:
+        model.load_state_dict(checkpoint['model_state_dict'])
+
+
     print(colorama.Fore.BLUE)
     print('model size:', f'{prefixed.Float(sum(p.numel() for p in model.parameters())):.2h}', 'parameters')
     print(colorama.Style.RESET_ALL, end='')
     if args.compile:
         model = torch.compile(model)
+
 
     with wandb_cm:
         train(
@@ -240,6 +260,8 @@ if __name__ == '__main__':
             hprms_cfg,
 
             model,
+
+            checkpoint,
 
             dataset,
 
