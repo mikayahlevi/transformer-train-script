@@ -113,6 +113,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--device', type = str, default = 'cuda')
 
+    parser.add_argument('--precision', type = str, choices = ['fp16', 'bf16', 'fp32'], default = None, help = 'set to fp16 or bf16 to enable mixed precision. otherwise defaults to fp32')
+
+
     parser.add_argument('--pipeline-name', type = str, default = None)
     parser.add_argument('--pipeline-path', type = str, default = None)
 
@@ -229,13 +232,13 @@ if __name__ == '__main__':
 
 
     checkpoint = None
-    if args.load_checkpoint_path is not None:
-        if not os.path.exists(args.load_checkpoint_path):
-            raise ValueError(f'checkpoint load path {args.load_checkpoint_path} does not exist')
+    if args.checkpoint_load_path is not None:
+        if not os.path.exists(args.checkpoint_load_path):
+            raise ValueError(f'checkpoint load path {args.checkpoint_load_path} does not exist')
 
-        checkpoint = torch.load(args.load_checkpoint_path, map_location = args.device)
+        checkpoint = torch.load(args.checkpoint_load_path, map_location = args.device)
         print(colorama.Fore.BLUE)
-        print(f'loaded checkpoint from {args.load_checkpoint_path}')
+        print(f'loaded checkpoint from {args.checkpoint_load_path}')
         print(colorama.Style.RESET_ALL, end='')
 
 
@@ -277,5 +280,7 @@ if __name__ == '__main__':
 
             checkpoint_save_path,
 
-            args.device
+            args.device,
+
+            args.precision
         )
