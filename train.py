@@ -16,6 +16,7 @@ class train_config:
     sequence_length: int
     batch_size: int
 
+    shuffle: bool
 
     total_steps: int
 
@@ -129,7 +130,7 @@ def train(
     print(colorama.Style.RESET_ALL, end='')
 
 
-    train_dataloader, val_dataloader = pipeline.get_dataloaders(dataset, batch_size = settings.batch_size, shuffle = True, pin_memory = (device == 'cuda'))
+    train_dataloader, val_dataloader = pipeline.get_dataloaders(dataset, batch_size = settings.batch_size, shuffle = settings.shuffle, pin_memory = (device == 'cuda'))
     train_dataloader_iter = iter(train_dataloader)
 
     mask_value = -100

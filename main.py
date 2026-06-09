@@ -144,7 +144,6 @@ if __name__ == '__main__':
 
     parser.add_argument('--checkpoint-load-path', type = str, default = None, help = 'path to a checkpoint to load and resume training from')
 
-
     # add overrides for all config values as cli arguments
     for config in [train_config, hyperparameter_config, transformer_config]:
         for field in dataclasses.fields(config):
