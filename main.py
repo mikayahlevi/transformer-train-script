@@ -95,9 +95,6 @@ def get_config(args: argparse.Namespace, cfg_type: type[Any], cfg_name: str, ove
 def add_typed_arguments(parser: argparse.ArgumentParser, arg_str: str, type: Any):
     origin = get_origin(type)
 
-
-    if type == bool:
-        parser.add_argument(arg_str, action = 'store_true')
     if origin == list:
         parser.add_argument(arg_str, type = lambda s: [type.__args__[0](item) for item in s.split(',')])
     if origin == tuple:
