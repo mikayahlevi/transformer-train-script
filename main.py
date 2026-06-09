@@ -124,9 +124,10 @@ def manage_dataset_and_tokenizer(args: argparse.Namespace, pipeline: pipeline_pr
     if dataset is None or tokenizer is None:
         dataset, tokenizer = pipeline.get_dataset_and_tokenizer(sequence_length = train_cfg.sequence_length, dataset = dataset, tokenizer = tokenizer)
 
-    if args.dataset_save_path is not None:
+    # only save if they weren't loaded
+    if args.dataset_save_path is not None and args.dataset_load_path is None:
         pipeline.save_dataset(dataset, args.dataset_save_path)
-    if args.tokenizer_save_path is not None:
+    if args.tokenizer_save_path is not None and args.tokenizer_load_path is None:
         pipeline.save_tokenizer(tokenizer, args.tokenizer_save_path)
 
     return dataset, tokenizer
