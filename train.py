@@ -59,11 +59,13 @@ def configure_optimizer(model, hyperparameters):
     optim_groups = [
         {
             'params': [wte_weight] + [final_ln_weight] + first_ln_weights + second_ln_weights,
-            'weight_decay': 0.0
+            'weight_decay': 0.0,
+            'max_grad_norm': 1.0
         },
         {
             'params': mlp_up_weights + mlp_down_weights + query_layer_weights + key_layer_weights + value_layer_weights + attention_down_weights,
-            'weight_decay': hyperparameters.weight_decay
+            'weight_decay': hyperparameters.weight_decay,
+            'max_grad_norm': 1.0
         }
     ]
 
@@ -227,7 +229,8 @@ def train(
 
         if (step + 1) % settings.update_interval == 0:
             scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            for group in optimizer.param_groups:
+                torch.nn.utils.clip_grad_norm_(group['params'], group['max_grad_norm'])
             scaler.step(optimizer)
             scaler.update()
             optimizer.zero_grad()
