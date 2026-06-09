@@ -170,6 +170,10 @@ def train(
         print('resuming training from checkpoint at step', start_step)
         print(colorama.Style.RESET_ALL, end='')
 
+        # advance dataloader to the correct position within the current epoch
+        for _ in range(start_step % len(train_dataloader)):
+            next(train_dataloader_iter)
+
 
 
     logged_tr_loss_avg = accumulating_metric()
@@ -189,14 +193,14 @@ def train(
         logits = model(inputs)
 
         # flatten batch and sequence dimensions into one dimension for computing the loss
-        loss = criterion(logits.flatten(-3, -2), labels.flatten(-2, -1)) / settings.update_interval
+        loss = criterion(logits.flatten(-3, -2), labels.flatten(-2, -1))
 
 
         logged_tr_loss_avg.update(loss.item())
         display_tr_loss_sum.update(loss.item())
 
 
-        loss.backward()
+        (loss / settings.update_interval).backward()
 
         # note that we use step + 1 since we are measuring the completed steps and we have already executed a single step
 
