@@ -121,10 +121,9 @@ class transformer_cache(torch.nn.Module):
 
 
 
-class transformer_attention(torch.nn.Module):
+class attention(torch.nn.Module):
     def __init__(self, config, block_index: int):
-        super(transformer_attention, self).__init__()
-
+        super(attention, self).__init__()
 
         self.block_index = block_index
 
@@ -175,7 +174,7 @@ class transformer_attention(torch.nn.Module):
             cache.append_values(values, self.block_index)
 
         # transpose to switch the sequence and head dimensions
-        attention = torch.nn.functional.scaled_dot_product_attention(
+        output = torch.nn.functional.scaled_dot_product_attention(
             queries.transpose(-3, -2),
             (cache.get_full_keys(self.block_index) if use_cache else keys).transpose(-3, -2),
             (cache.get_full_values(self.block_index) if use_cache else values).transpose(-3, -2),
@@ -187,7 +186,7 @@ class transformer_attention(torch.nn.Module):
 
         return torch.nn.functional.dropout(
             self.attention_down(
-                attention.flatten(-2)
+                output.flatten(-2)
             ),
             p = self.config.dropout_rate,
             training = self.training
@@ -217,7 +216,7 @@ class transformer_block(torch.nn.Module):
         torch.nn.init.normal_(self.mlp[0].weight, mean = 0, std = 0.02)
         torch.nn.init.normal_(self.mlp[2].weight, mean = 0, std = 0.02 / math.sqrt(2 * config.n_blocks))
 
-        self.attention = transformer_attention(config, block_index)
+        self.attn = attention(config, block_index)
 
 
     def forward(self, activations: torch.Tensor, cache: Optional[transformer_cache] = None) -> torch.Tensor:
