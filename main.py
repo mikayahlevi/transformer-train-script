@@ -203,6 +203,17 @@ if __name__ == '__main__':
     # vocab size is determined after sequence length is needed from the train config
     train_cfg, hprms_cfg = get_config(args, train_config, 'train', {}, train_folder_path), get_config(args, hyperparameter_config, 'hprms', {}, train_folder_path)
 
+    if train_cfg.total_steps % train_cfg.update_interval != 0:
+        print(colorama.Fore.YELLOW)
+        print('warning: total_steps is not a multiple of update_interval, the final gradients will be discarded')
+        print(colorama.Style.RESET_ALL, end='')
+
+    if args.checkpoint_save_interval is not None and args.checkpoint_save_interval % train_cfg.update_interval != 0:
+        print(colorama.Fore.YELLOW)
+        print('warning: checkpoint_save_interval is not a multiple of update_interval, the most recent unapplied gradients will not persist between saving and loading the checkpoint')
+        print(colorama.Style.RESET_ALL, end='')
+
+
     pipeline = get_pipeline(args)
 
     dataset, tokenizer = manage_dataset_and_tokenizer(args, pipeline, sequence_length = train_cfg.sequence_length)
@@ -269,7 +280,7 @@ if __name__ == '__main__':
     print(colorama.Style.RESET_ALL, end='')
     if args.compile:
         model = torch.compile(model)
-
+    
 
     with wandb_cm:
         train(
