@@ -71,7 +71,7 @@ class xpos(torch.nn.Module):
 
 
 class transformer_cache(torch.nn.Module):
-    def __init__(self, config: transformer_config, proceeding_dimensions: tuple[int, ...] = (1,)):
+    def __init__(self, config: transformer_config, proceeding_dimensions: tuple[int, ...] = ()):
         super(transformer_cache, self).__init__()
 
         self.config = config
