@@ -122,12 +122,12 @@ def manage_dataset_and_tokenizer(args: argparse.Namespace, pipeline: pipeline_pr
         print(colorama.Style.RESET_ALL, end='')
 
     if dataset is None or tokenizer is None:
-        dataset, tokenizer = pipeline.get_dataset_and_tokenizer(sequence_length = train_cfg.sequence_length, dataset = dataset, tokenizer = tokenizer)
+        dataset, tokenizer = pipeline.get_dataset_and_tokenizer(sequence_length = sequence_length, dataset = dataset, tokenizer = tokenizer)
 
-    # only save if they weren't loaded
-    if args.dataset_save_path is not None and args.dataset_load_path is None:
+    # only save if they were loaded from a different path
+    if args.dataset_save_path is not None and args.dataset_load_path != args.dataset_save_path:
         pipeline.save_dataset(dataset, args.dataset_save_path)
-    if args.tokenizer_save_path is not None and args.tokenizer_load_path is None:
+    if args.tokenizer_save_path is not None and args.tokenizer_load_path != args.tokenizer_save_path:
         pipeline.save_tokenizer(tokenizer, args.tokenizer_save_path)
 
     return dataset, tokenizer
