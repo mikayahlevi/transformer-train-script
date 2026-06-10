@@ -280,7 +280,7 @@ if __name__ == '__main__':
     print(colorama.Style.RESET_ALL, end='')
     if args.compile:
         model = torch.compile(model)
-    
+
 
     with wandb_cm:
         train(
