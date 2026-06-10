@@ -17,19 +17,15 @@ from pipeline import pipeline_protocol, get_pipeline
 
 
 def get_train_folder_path(train_folder_dir: str, train_folder_name: Optional[str]) -> str:
-    n_tries = 1000
+    n_tries = 256
 
     if train_folder_name is None:
-        train_folder_auto_name_index = 0
-
         for train_folder_auto_name_index in range(n_tries):
             train_folder_auto_name = 'train-' + str(train_folder_auto_name_index)
 
             current_auto_path = os.path.join(train_folder_dir, train_folder_auto_name)
 
-            if os.path.exists(current_auto_path):
-                train_folder_auto_name_index += 1
-            else:
+            if not os.path.exists(current_auto_path):
                 return current_auto_path
 
         raise ValueError(f'Could not find a free train folder name in {train_folder_dir} after a maximum of n_tries tries')
